@@ -41,6 +41,7 @@ typedef struct _Player_State {
    Evas_Object *title_label;
    Evas_Object *album_art;
    Evas_Object *genlist;
+   Evas_Object *album_tracklist;
 
    Library     *lib;
    Filter_Mode  filter;

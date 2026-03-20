@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 static void populate_albums_by_artist(Player_State *ps, const char *artist);
+void populate_current_album_tracklist(struct _Player_State *ps);
 
 /* settings popup forward declarations */
 static void _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
@@ -185,6 +186,7 @@ genlist_selected_cb(void *data, Evas_Object *obj, void *event_info)
    switch (id->type) {
    case ITEM_ALBUM:
       playback_album_start(ps, id->u.name);
+      populate_current_album_tracklist(ps);
       break;
    case ITEM_TRACK:
       ps->album_mode = EINA_FALSE;
@@ -430,6 +432,17 @@ ui_setup(Player_State *ps)
    evas_object_show(slider);
    elm_box_pack_end(right, slider);
    ps->slider = slider;
+   
+   // Tracklist under progress bar
+   Evas_Object *tracklist = elm_genlist_add(right);
+   evas_object_size_hint_weight_set(tracklist, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+   evas_object_size_hint_align_set(tracklist, EVAS_HINT_FILL, EVAS_HINT_FILL);
+   evas_object_show(tracklist);
+   elm_box_pack_end(right, tracklist);
+   ps->album_tracklist = tracklist;
+     
+   // start empty
+   elm_genlist_clear(tracklist);
 
    evas_object_smart_callback_add(btn_play, "clicked", play_cb, ps);
    evas_object_smart_callback_add(btn_pause, "clicked", pause_cb, ps);
@@ -442,6 +455,8 @@ ui_setup(Player_State *ps)
    ps->filter = FILTER_ALBUMS;
    ui_refresh_current(ps);
 }
+
+
 
 /* ============================
  * Right-click → Settings popup
@@ -461,6 +476,41 @@ _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
     evas_object_show(menu);
 }
 
+void populate_current_album_tracklist(Player_State *ps)
+{
+    if (!ps->album_tracklist)
+        return;
+
+    elm_genlist_clear(ps->album_tracklist);
+
+    if (!ps->current_album_tracks)
+        return;
+
+    Track *t;
+    Eina_List *l;
+    int index = 0;
+
+    EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
+        Item_Data *id = calloc(1, sizeof(Item_Data));
+        id->type = ITEM_TRACK;
+        id->u.track = t;
+
+        Elm_Object_Item *it = elm_genlist_item_append(
+            ps->album_tracklist,
+            &itc_track,
+            id,
+            NULL,
+            ELM_GENLIST_ITEM_NONE,
+            genlist_selected_cb,
+            ps
+        );
+
+        if (index == ps->current_index)
+            elm_genlist_item_selected_set(it, EINA_TRUE);
+
+        index++;
+    }
+}
 
 static void
 _settings_open_cb(void *data, Evas_Object *obj, void *event_info)
