@@ -270,7 +270,7 @@ ui_setup(Player_State *ps)
 
    Evas_Object *panes = elm_panes_add(win);
    elm_panes_horizontal_set(panes, EINA_FALSE);
-   elm_panes_content_left_size_set(panes, 0.50);
+   elm_panes_content_left_size_set(panes, 0.40);
    evas_object_size_hint_weight_set(panes, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
    evas_object_show(panes);
    elm_win_resize_object_add(win, panes);
