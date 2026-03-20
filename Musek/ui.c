@@ -189,11 +189,25 @@ genlist_selected_cb(void *data, Evas_Object *obj, void *event_info)
       populate_current_album_tracklist(ps);
       break;
    case ITEM_TRACK:
-      ps->album_mode = EINA_FALSE;
-      ps->current_album = NULL;
-      ps->current_album_tracks = NULL;
-      ps->current_index = 0;
-      playback_track_start(ps, id->u.track);
+{
+    ps->album_mode = EINA_TRUE;
+
+    // Find index of clicked track inside current album
+    int idx = 0;
+    Eina_List *l;
+    char *path;
+
+    EINA_LIST_FOREACH(ps->current_album_tracks, l, path) {
+        if (strcmp(path, id->u.track->path) == 0) {
+            ps->current_index = idx;
+            break;
+        }
+        idx++;
+    }
+
+    playback_track_start(ps, id->u.track);
+    break;
+}
       break;
    default:
       break;
