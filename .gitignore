@@ -27,3 +27,4 @@ Thumbs.db
 # Editor-specific junk
 .vscode/
 .idea/
+.cache/
