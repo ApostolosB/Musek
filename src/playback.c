@@ -83,6 +83,8 @@ playback_track_start(Player_State *ps, Track *t)
    emotion_object_file_set(ps->emotion, t->path);
    emotion_object_play_set(ps->emotion, EINA_TRUE);
    update_title(ps, t);
+
+   ui_update_album_art(ps, t);
 }
 
 void

@@ -16,6 +16,7 @@ srcs = [
   'ui_populate.c',
   'ui_setup.c',
   'ui_settings.c',
+  'ui_albumart.c', 
 ]
 
 executable('musek', srcs, dependencies: deps)

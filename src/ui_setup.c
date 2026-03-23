@@ -116,8 +116,20 @@ ui_setup(Player_State *ps)
     elm_object_part_content_set(panes, "right", right);
 
     Evas_Object *album_art = elm_image_add(right);
-    evas_object_size_hint_weight_set(album_art, 0.0, 0.0);
-    evas_object_size_hint_align_set(album_art, 0.5, 0.0);
+    // Preserve aspect ratio
+    elm_image_aspect_fixed_set(album_art, EINA_TRUE);
+    
+    // Allow scaling but keep proportions
+    elm_image_resizable_set(album_art, EINA_TRUE, EINA_TRUE);
+    // Optional: if you want the image to fill the box without borders
+    // elm_image_fill_outside_set(album_art, EINA_TRUE);
+    // Give it some space
+    evas_object_size_hint_min_set(album_art, 250, 250);
+    evas_object_size_hint_weight_set(album_art, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(album_art, EVAS_HINT_FILL, 0.0);
+
+    evas_object_size_hint_padding_set(album_art, 0, 0, 15, 0);
+
     evas_object_show(album_art);
     elm_box_pack_end(right, album_art);
     ps->album_art = album_art;
@@ -131,7 +143,7 @@ ui_setup(Player_State *ps)
 
     Evas_Object *emotion = emotion_object_add(evas_object_evas_get(win));
     emotion_object_init(emotion, NULL);
-    evas_object_size_hint_weight_set(emotion, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_weight_set(emotion, 0.0, 0.0);
     evas_object_size_hint_align_set(emotion, EVAS_HINT_FILL, 0.0);
     evas_object_show(emotion);
     elm_box_pack_end(right, emotion);

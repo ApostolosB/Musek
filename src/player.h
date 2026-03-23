@@ -75,4 +75,6 @@ void ui_refresh_current(Player_State *ps);
 /* scanner.c */
 void scanner_start(Player_State *ps, const char *path);
 
+void ui_update_album_art(Player_State *ps, Track *t);
+
 #endif
