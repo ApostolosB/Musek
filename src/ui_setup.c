@@ -16,10 +16,14 @@ populate_current_album_tracklist(Player_State *ps)
     if (!ps->album_tracklist)
         return;
 
+    ps->suppress_tracklist_callbacks = EINA_TRUE;
+
     elm_genlist_clear(ps->album_tracklist);
 
-    if (!ps->current_album_tracks)
+    if (!ps->current_album_tracks) {
+        ps->suppress_tracklist_callbacks = EINA_FALSE;
         return;
+    }
 
     Track *t;
     Eina_List *l;
@@ -36,7 +40,7 @@ populate_current_album_tracklist(Player_State *ps)
             id,
             NULL,
             ELM_GENLIST_ITEM_NONE,
-            genlist_selected_cb,
+            album_track_selected_cb,
             ps
         );
 
@@ -45,7 +49,11 @@ populate_current_album_tracklist(Player_State *ps)
 
         index++;
     }
+
+    ps->suppress_tracklist_callbacks = EINA_FALSE;
 }
+
+
 
 void
 ui_setup(Player_State *ps)

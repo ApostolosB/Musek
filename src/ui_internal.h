@@ -35,6 +35,8 @@ void populate_artists(Player_State *ps);
 void populate_albums(Player_State *ps);
 void populate_tracks(Player_State *ps);
 void populate_albums_by_artist(Player_State *ps, const char *artist);
+void album_track_selected_cb(void *data, Evas_Object *obj, void *event_info);
+
 
 
 /* callbacks from ui_callbacks.c */

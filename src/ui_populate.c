@@ -33,7 +33,9 @@ _gl_del(void *data, Evas_Object *obj)
     free(data);
 }
 
-/* populate artists */
+/* ------------------------------
+   Populate Artists (unchanged)
+   ------------------------------ */
 void
 populate_artists(Player_State *ps)
 {
@@ -41,93 +43,116 @@ populate_artists(Player_State *ps)
 
     char *name;
     Eina_List *l;
+
     EINA_LIST_FOREACH(ps->lib->artists, l, name) {
         Item_Data *id = calloc(1, sizeof(Item_Data));
         id->type = ITEM_ARTIST;
         id->u.name = name;
+
         elm_genlist_item_append(ps->genlist, &itc_artist, id, NULL,
                                 ELM_GENLIST_ITEM_NONE, NULL, ps);
     }
 }
 
-/* populate albums */
+/* ------------------------------
+   Populate Albums (grouped by artist)
+   ------------------------------ */
 void
 populate_albums(Player_State *ps)
 {
     elm_genlist_clear(ps->genlist);
 
-    char *name;
+    Album_Entry *ae;
     Eina_List *l;
-    EINA_LIST_FOREACH(ps->lib->albums, l, name) {
+    const char *last_artist = NULL;
+
+    EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
+
+        /* Insert artist header when artist changes */
+        if (!last_artist || strcasecmp(last_artist, ae->artist) != 0) {
+            Item_Data *id_header = calloc(1, sizeof(Item_Data));
+            id_header->type = ITEM_ARTIST;
+            id_header->u.name = ae->artist;
+
+            elm_genlist_item_append(ps->genlist, &itc_artist, id_header, NULL,
+                                    ELM_GENLIST_ITEM_NONE, NULL, ps);
+
+            last_artist = ae->artist;
+        }
+
+        /* Insert album under the artist */
         Item_Data *id = calloc(1, sizeof(Item_Data));
         id->type = ITEM_ALBUM;
-        id->u.name = name;
+        id->u.name = ae->album;
+
         elm_genlist_item_append(ps->genlist, &itc_album, id, NULL,
                                 ELM_GENLIST_ITEM_NONE, NULL, ps);
     }
 }
 
-/* populate tracks */
+/* ------------------------------
+   Populate Tracks (grouped by album)
+   ------------------------------ */
 void
 populate_tracks(Player_State *ps)
 {
     elm_genlist_clear(ps->genlist);
 
-    char *album_name;
+    Album_Entry *ae;
     Eina_List *l;
-    EINA_LIST_FOREACH(ps->lib->albums, l, album_name) {
+
+    EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
+
+        /* Album header */
         Item_Data *id_header = calloc(1, sizeof(Item_Data));
         id_header->type = ITEM_ALBUM_HEADER;
-        id_header->u.name = album_name;
+        id_header->u.name = ae->album;
+
         elm_genlist_item_append(ps->genlist, &itc_album_header, id_header, NULL,
                                 ELM_GENLIST_ITEM_NONE, NULL, ps);
 
-        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, album_name);
+        /* Tracks for this album */
+        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, ae->album);
         Track *t;
         Eina_List *lt;
+
         EINA_LIST_FOREACH(tracks, lt, t) {
             Item_Data *id = calloc(1, sizeof(Item_Data));
             id->type = ITEM_TRACK;
             id->u.track = t;
+
             elm_genlist_item_append(ps->genlist, &itc_track, id, NULL,
                                     ELM_GENLIST_ITEM_NONE, NULL, ps);
         }
     }
 }
 
-/* populate albums filtered by artist */
+/* ------------------------------
+   Populate Albums Filtered by Artist
+   ------------------------------ */
 void
 populate_albums_by_artist(Player_State *ps, const char *artist)
 {
     elm_genlist_clear(ps->genlist);
 
-    char *album_name;
+    Album_Entry *ae;
     Eina_List *l;
 
-    EINA_LIST_FOREACH(ps->lib->albums, l, album_name) {
-        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, album_name);
-        if (!tracks) continue;
-
-        Track *t;
-        Eina_List *lt;
-        Eina_Bool match = EINA_FALSE;
-
-        EINA_LIST_FOREACH(tracks, lt, t) {
-            if (t->artist && strcmp(t->artist, artist) == 0) {
-                match = EINA_TRUE;
-                break;
-            }
-        }
-
-        if (match) {
+    EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
+        if (strcasecmp(ae->artist, artist) == 0) {
             Item_Data *id = calloc(1, sizeof(Item_Data));
             id->type = ITEM_ALBUM;
-            id->u.name = album_name;
+            id->u.name = ae->album;
+
             elm_genlist_item_append(ps->genlist, &itc_album, id, NULL,
                                     ELM_GENLIST_ITEM_NONE, NULL, ps);
         }
     }
 }
+
+/* ------------------------------
+   Init Item Classes
+   ------------------------------ */
 void ui_populate_init(void)
 {
     memset(&itc_artist, 0, sizeof(itc_artist));

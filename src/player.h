@@ -8,6 +8,9 @@
 #include <Ecore.h>
 #include <taglib/tag_c.h>
 
+/* ------------------------------
+   Track Structure
+   ------------------------------ */
 typedef struct _Track {
    char *title;
    char *artist;
@@ -16,24 +19,44 @@ typedef struct _Track {
    int   track_no;
 } Track;
 
+/* ------------------------------
+   Album Entry (NEW)
+   Used for hierarchical sorting:
+   artist → album
+   ------------------------------ */
+typedef struct {
+   char *artist;
+   char *album;
+} Album_Entry;
+
+/* ------------------------------
+   Filter Modes
+   ------------------------------ */
 typedef enum {
    FILTER_ARTISTS,
    FILTER_ALBUMS,
    FILTER_TRACKS
 } Filter_Mode;
 
+/* ------------------------------
+   Library Structure
+   ------------------------------ */
 typedef struct _Library {
-   Eina_List *artists;      // char* (sorted)
-   Eina_List *albums;       // char* (sorted)
+   Eina_List *artists;      // char* (sorted alphabetically)
+   Eina_List *albums;       // Album_Entry* (sorted by artist → album)
    Eina_Hash *album_tracks; // key: album name (char*), value: Eina_List* of Track*
-} Library; 
+} Library;
 
-/* Simple settings structure (expandable later) */
+/* ------------------------------
+   Settings
+   ------------------------------ */
 typedef struct _Settings {
    char *music_folder;   /* directory to scan */
 } Settings;
 
-
+/* ------------------------------
+   Player State
+   ------------------------------ */
 typedef struct _Player_State {
    Evas_Object *win;
    Evas_Object *emotion;
@@ -47,14 +70,20 @@ typedef struct _Player_State {
    Library     *lib;
    Filter_Mode  filter;
 
-   // album playback state
-   Eina_Bool    album_mode;
+   /* album playback state */
+   Eina_Bool    album_mode;   
+   Eina_Bool suppress_tracklist_callbacks;
+
    const char  *current_album;
    Eina_List   *current_album_tracks;
    int          current_index;
 
    Settings    *settings;   /* user settings */
 } Player_State;
+
+/* ------------------------------
+   Function Declarations
+   ------------------------------ */
 
 /* library.c */
 Library *library_new(void);
@@ -77,6 +106,7 @@ void ui_refresh_current(Player_State *ps);
 /* scanner.c */
 void scanner_start(Player_State *ps, const char *path);
 
+/* album art update */
 void ui_update_album_art(Player_State *ps, Track *t);
 
 #endif

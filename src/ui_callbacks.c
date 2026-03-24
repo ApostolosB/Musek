@@ -15,33 +15,76 @@ genlist_selected_cb(void *data, Evas_Object *obj, void *event_info)
     }
 
     switch (id->type) {
+
+    /* ------------------------------
+       ALBUM SELECTED
+       ------------------------------ */
     case ITEM_ALBUM:
-        playback_album_start(ps, id->u.name);
-        populate_current_album_tracklist(ps);
-        break;
-
-    case ITEM_TRACK:
     {
+        const char *album = id->u.name;
+
         ps->album_mode = EINA_TRUE;
+        ps->current_album = album;
 
+        /* Load tracks for this album */
         ps->current_album_tracks =
-            eina_hash_find(ps->lib->album_tracks, ps->current_album);
+            eina_hash_find(ps->lib->album_tracks, album);
 
-        int idx = 0;
-        Eina_List *l;
-        Track *t;
-
-        EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
-            if (t == id->u.track) {
-                ps->current_index = idx;
-                break;
-            }
-            idx++;
+        if (!ps->current_album_tracks) {
+            elm_genlist_clear(ps->album_tracklist);
+            break;
         }
 
+        /* Start playback at first track */
+        ps->current_index = 0;
+        Track *first = eina_list_nth(ps->current_album_tracks, 0);
+
+        if (first)
+            playback_track_start(ps, first);
+
+        populate_current_album_tracklist(ps);
+        break;
+    }
+
+    /* ------------------------------
+       TRACK SELECTED
+       ------------------------------ */
+    case ITEM_TRACK:
+    {
+        /* Disable album mode */
+        ps->album_mode = EINA_FALSE;
+        ps->current_album = NULL;
+
+        /* Clear right pane */
+        elm_genlist_clear(ps->album_tracklist);
+
+        /* IMPORTANT:
+         * Do NOT free ps->current_album_tracks.
+         * It may point to a list owned by lib->album_tracks.
+         */
+
+        /* Create a new one-element list */
+        ps->current_album_tracks = eina_list_append(NULL, id->u.track);
+        ps->current_index = 0;
+
+        /* Add selected track to right pane */
+        Item_Data *tid = calloc(1, sizeof(Item_Data));
+        tid->type = ITEM_TRACK;
+        tid->u.track = id->u.track;
+
+        elm_genlist_item_append(ps->album_tracklist,
+                                &itc_track,
+                                tid,
+                                NULL,
+                                ELM_GENLIST_ITEM_NONE,
+                                NULL,
+                                ps);
+
+        /* Start playback */
         playback_track_start(ps, id->u.track);
         break;
     }
+
     default:
         break;
     }
@@ -126,6 +169,7 @@ void btn_prev_cb(void *data, Evas_Object *obj, void *event_info)
 
     populate_current_album_tracklist(ps);
 }
+
 void
 volume_changed_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -133,3 +177,35 @@ volume_changed_cb(void *data, Evas_Object *obj, void *event_info)
     double vol = elm_slider_value_get(obj);
     playback_set_volume(ps, vol);
 }
+void
+album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
+{
+    Player_State *ps = data;
+
+    if (ps->suppress_tracklist_callbacks)
+        return;
+
+    Elm_Object_Item *it = event_info;
+    Item_Data *id = elm_object_item_data_get(it);
+    if (!id || id->type != ITEM_TRACK)
+        return;
+
+    /* Find index */
+    int idx = 0;
+    Track *t;
+    Eina_List *l;
+
+    EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
+        if (t == id->u.track) {
+            ps->current_index = idx;
+            break;
+        }
+        idx++;
+    }
+
+    playback_track_start(ps, id->u.track);
+
+    /* Refresh right pane */
+    populate_current_album_tracklist(ps);
+}
+
