@@ -2,6 +2,8 @@
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
+#include <Ecore_File.h>
+#include <limits.h>
 
 /* genlist item classes (tracks view) */
 Elm_Genlist_Item_Class itc_album_header;
@@ -11,6 +13,68 @@ Elm_Genlist_Item_Class itc_track;
 Elm_Gengrid_Item_Class itc_artist_tile;   /* NEW */
 Elm_Gengrid_Item_Class itc_artist_group;
 Elm_Gengrid_Item_Class itc_album;
+
+static void _album_del(void *data, Evas_Object *obj);
+
+
+/* Build a stable thumbnail path under ~/.cache/musek/album_thumbs */
+static void
+_album_thumb_path_get(const char *dir, char *out, size_t out_size)
+{
+    const char *home = getenv("HOME");
+    if (!home) home = ".";
+
+    char cache_dir[PATH_MAX];
+    snprintf(cache_dir, sizeof(cache_dir),
+             "%s/.cache/musek/album_thumbs", home);
+
+    /* Ensure directory exists */
+    ecore_file_mkpath(cache_dir);
+
+    /* Hash the album directory to get a safe filename */
+    unsigned int h = eina_hash_superfast(dir, strlen(dir));
+
+    snprintf(out, out_size, "%s/%u.jpg", cache_dir, h);
+}
+
+/* Generate a small thumbnail from src → dst using the given Evas canvas */
+static Eina_Bool
+_album_thumb_generate(Evas *evas,
+                      const char *src,
+                      const char *dst,
+                      int size)
+{
+    Evas_Object *img = evas_object_image_add(evas);
+    if (!img) return EINA_FALSE;
+
+    evas_object_image_file_set(img, src, NULL);
+
+    int w = 0, h = 0;
+    evas_object_image_size_get(img, &w, &h);
+    if (w <= 0 || h <= 0) {
+        evas_object_del(img);
+        return EINA_FALSE;
+    }
+
+    /* Scale so the longest side == size */
+    int max_side = (w > h) ? w : h;
+    double scale = (double)size / (double)max_side;
+    int nw = (int)(w * scale);
+    int nh = (int)(h * scale);
+
+    if (nw <= 0) nw = 1;
+    if (nh <= 0) nh = 1;
+
+    evas_object_image_fill_set(img, 0, 0, nw, nh);
+    evas_object_resize(img, nw, nh);
+
+    /* Save as JPEG thumbnail */
+    Eina_Bool ok = evas_object_image_save(img, dst, NULL, "quality=90");
+
+    evas_object_del(img);
+    return ok;
+}
+
 
 /* ============================================================
    ARTIST TILE (gengrid)
@@ -130,20 +194,31 @@ _album_content_get(void *data, Evas_Object *obj, const char *part)
 
     Evas_Object *img = elm_image_add(obj);
     elm_image_aspect_fixed_set(img, EINA_TRUE);
-
-    const char *path = (a && a->art_path && a->art_path[0])
-                       ? a->art_path
-                       : "data/noart.png";
-
-    elm_image_file_set(img, path, NULL);
     evas_object_show(img);
-    return img;
-}
 
-static void
-_album_del(void *data, Evas_Object *obj)
-{
-    free(data);
+    /* Fallback if we somehow have no album entry */
+    if (!a || !a->art_path || !a->art_path[0]) {
+        elm_image_file_set(img, "data/noart.png", NULL);
+        return img;
+    }
+
+    /* Build thumbnail path based on album directory */
+    char thumb_path[PATH_MAX];
+    _album_thumb_path_get(a->path, thumb_path, sizeof(thumb_path));
+
+    /* If thumbnail is missing, generate it */
+    if (!ecore_file_exists(thumb_path)) {
+        Evas *evas = evas_object_evas_get(obj);
+        if (!_album_thumb_generate(evas, a->art_path, thumb_path, 256)) {
+            /* If generation failed, fall back to full image or noart */
+            elm_image_file_set(img, a->art_path, NULL);
+            return img;
+        }
+    }
+
+    /* At this point, thumb_path should exist (or we fell back above) */
+    elm_image_file_set(img, thumb_path, NULL);
+    return img;
 }
 
 /* ============================================================
@@ -323,8 +398,11 @@ populate_tracks(Player_State *ps)
 }
 
 
-
-
+static void
+_album_del(void *data, Evas_Object *obj)
+{
+    free(data);
+}
 
 
 /* ============================================================
