@@ -58,8 +58,7 @@ _album_detect_art(Album_Entry *ae)
 {
     if (!ae || !ae->path) {
         ae->art_path = strdup("data/noart.png");
-        printf("ALBUM ART DEBUG: artist='%s' album='%s' dir='(null)' art='%s'\n",
-               ae->artist, ae->album, ae->art_path);
+        
         return;
     }
 
@@ -81,8 +80,7 @@ _album_detect_art(Album_Entry *ae)
         snprintf(cover, sizeof(cover), "%s/%s", ae->path, cover_names[i]);
         if (ecore_file_exists(cover)) {
             ae->art_path = strdup(cover);
-            printf("ALBUM ART DEBUG: artist='%s' album='%s' dir='%s' art='%s'\n",
-                   ae->artist, ae->album, ae->path, ae->art_path);
+            
             return;
         }
     }
@@ -92,16 +90,14 @@ _album_detect_art(Album_Entry *ae)
         snprintf(folder, sizeof(folder), "%s/%s", ae->path, folder_names[i]);
         if (ecore_file_exists(folder)) {
             ae->art_path = strdup(folder);
-            printf("ALBUM ART DEBUG: artist='%s' album='%s' dir='%s' art='%s'\n",
-                   ae->artist, ae->album, ae->path, ae->art_path);
+            
             return;
         }
     }
 
     /* Fallback */
     ae->art_path = strdup("data/noart.png");
-    printf("ALBUM ART DEBUG: artist='%s' album='%s' dir='%s' art='%s'\n",
-           ae->artist, ae->album, ae->path, ae->art_path);
+    
 }
 
 
