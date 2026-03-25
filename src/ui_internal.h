@@ -5,53 +5,80 @@
 #include <Elementary.h>
 #include <Emotion.h>
 
-void ui_populate_init(void);
-
-/* item types */
+/* ------------------------------
+   Item Types
+   ------------------------------ */
 typedef enum {
-    ITEM_ARTIST,
-    ITEM_ALBUM,
-    ITEM_ALBUM_HEADER,
-    ITEM_TRACK
+    ITEM_ARTIST,         /* Artist name (genlist or gengrid group header) */
+    ITEM_ALBUM,          /* Album tile (gengrid) */
+    ITEM_ALBUM_HEADER,   /* Album header in Tracks view (genlist) */
+    ITEM_TRACK           /* Track item (genlist) */
 } Item_Type;
 
-/* genlist item data */
+/* ------------------------------
+   Item Data
+   ------------------------------ */
 typedef struct _Item_Data {
     Item_Type type;
+    Player_State *ps;
+
+    const char *album;   /* album name for TRACK items */
+
     union {
-        const char     *name;    /* artists, headers */
-        Track          *track;   /* tracks */
-        Album_Entry    *album;   /* albums (with art) */
+        const char     *name;        /* Artist name */
+        Track          *track;       /* Track */
+        Album_Entry    *album_entry; /* Album entry for ALBUM items */
     } u;
 } Item_Data;
 
-
-/* shared item classes */
+/* ------------------------------
+   GENLIST Item Classes
+   (Artists view + Tracks view)
+   ------------------------------ */
 extern Elm_Genlist_Item_Class itc_artist;
-extern Elm_Genlist_Item_Class itc_album;
 extern Elm_Genlist_Item_Class itc_album_header;
 extern Elm_Genlist_Item_Class itc_track;
 
-/* populate functions */
+/* ------------------------------
+   GENGRID Item Classes
+   (Albums view)
+   ------------------------------ */
+extern Elm_Gengrid_Item_Class itc_artist_group;   /* group header */
+extern Elm_Gengrid_Item_Class itc_album;          /* album tile */
+
+/* ------------------------------
+   Populate Functions
+   ------------------------------ */
 void populate_artists(Player_State *ps);
+void populate_artists_grid(Player_State *ps);
 void populate_albums(Player_State *ps);
 void populate_tracks(Player_State *ps);
-void populate_albums_by_artist(Player_State *ps, const char *artist);
-void album_track_selected_cb(void *data, Evas_Object *obj, void *event_info);
+void populate_albums_for_artist(Player_State *ps, const char *artist);
 
-/* callbacks from ui_callbacks.c */
+/* ------------------------------
+   UI Callbacks
+   ------------------------------ */
 void genlist_selected_cb(void *data, Evas_Object *obj, void *event_info);
 void btn_artists_cb(void *data, Evas_Object *obj, void *event_info);
 void btn_albums_cb(void *data, Evas_Object *obj, void *event_info);
 void btn_tracks_cb(void *data, Evas_Object *obj, void *event_info);
+
+void album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info);
+void album_track_selected_cb(void *data, Evas_Object *obj, void *event_info);
+
 void play_cb(void *data, Evas_Object *obj, void *event_info);
 void pause_cb(void *data, Evas_Object *obj, void *event_info);
 void slider_changed_cb(void *data, Evas_Object *obj, void *event_info);
+void volume_changed_cb(void *data, Evas_Object *obj, void *event_info);   /* FIXED: missing */
 void btn_next_cb(void *data, Evas_Object *obj, void *event_info);
 void btn_prev_cb(void *data, Evas_Object *obj, void *event_info);
-void win_del_cb(void *data, Evas_Object *obj, void *event_info);
 
-/* callbacks from ui_settings.c */
+void win_del_cb(void *data, Evas_Object *obj, void *event_info);
 void _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
+
+/* ------------------------------
+   Init
+   ------------------------------ */
+void ui_populate_init(void);
 
 #endif

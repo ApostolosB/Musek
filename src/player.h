@@ -63,29 +63,48 @@ typedef struct _Settings {
 /* ------------------------------
    Player State
    ------------------------------ */
-typedef struct _Player_State {
-   Evas_Object *win;
-   Evas_Object *emotion;
-   Evas_Object *slider;
-   Evas_Object *title_label;
-   Evas_Object *album_art;
-   Evas_Object *genlist;
-   Evas_Object *album_tracklist;
-   Evas_Object *volume_slider;
+typedef struct _Player_State
+{
+    /* Main window */
+    Evas_Object *win;
 
-   Library     *lib;
-   Filter_Mode  filter;
+    /* LEFT PANE */
+    Evas_Object *artist_grid; /* NEW: Artists view (gengrid) */
+    Evas_Object *genlist;     /* Tracks view */
+    Evas_Object *gengrid;     /* Albums view */
 
-   /* album playback state */
-   Eina_Bool    album_mode;   
-   Eina_Bool suppress_tracklist_callbacks;
+    /* RIGHT PANE */
+    Evas_Object *title_label;
+    Evas_Object *album_art;
+    Evas_Object *emotion;
+    Evas_Object *slider;
+    Evas_Object *album_tracklist;
+    Evas_Object *volume_slider;
 
-   const char  *current_album;
-   Eina_List   *current_album_tracks;
-   int          current_index;
+    /* Playback state */
+    Eina_List *current_album_tracks;
+    int current_index;
+    Eina_Bool suppress_tracklist_callbacks;
 
-   Settings    *settings;   /* user settings */
+    /* Album playback mode */
+    Eina_Bool album_mode;
+    const char *current_album;   /* ✔ correct */
+
+    /* Settings */
+    Settings *settings;
+
+    /* Library */
+    Library *lib;
+
+    /* Current filter */
+    Filter_Mode filter;
+
+    /* Artist filter (used by artist grid → albums) */
+    const char *current_artist;
+
 } Player_State;
+
+
 
 /* ------------------------------
    Function Declarations
@@ -114,6 +133,15 @@ void scanner_start(Player_State *ps, const char *path);
 
 /* album art update */
 void ui_update_album_art(Player_State *ps, Track *t);
+
+/* Playback API */
+void playback_resume(Player_State *ps);
+void playback_pause(Player_State *ps);
+void playback_next(Player_State *ps);
+void playback_prev(Player_State *ps);
+void playback_seek(Player_State *ps, double pos);
+void playback_set_volume(Player_State *ps, double vol);
+void playback_track_start(Player_State *ps, Track *t);
 
 
 #endif

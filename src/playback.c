@@ -32,7 +32,7 @@ playback_finished_cb(void *data, Evas_Object *obj, void *event_info)
       ps->current_index = 0;
       return;
    }
-   
+
    populate_current_album_tracklist(ps);
    playback_track_start(ps, next);
 }
@@ -70,12 +70,11 @@ update_title(Player_State *ps, Track *t)
 {
    char buf[512];
    snprintf(buf, sizeof(buf),
-   "<b>%s - %s</b>",
-   (t->artist && t->artist[0]) ? t->artist : "Unknown Artist",
-   (t->album  && t->album[0])  ? t->album  : "Unknown Album");
+            "<b>%s - %s</b>",
+            (t->artist && t->artist[0]) ? t->artist : "Unknown Artist",
+            (t->album  && t->album[0])  ? t->album  : "Unknown Album");
 
-    elm_object_text_set(ps->title_label, buf);
-
+   elm_object_text_set(ps->title_label, buf);
 }
 
 void
@@ -110,6 +109,52 @@ playback_album_start(Player_State *ps, const char *album)
 void
 playback_set_volume(Player_State *ps, double vol)
 {
-    if (!ps || !ps->emotion) return;
-    emotion_object_audio_volume_set(ps->emotion, vol);
+   if (!ps || !ps->emotion) return;
+   emotion_object_audio_volume_set(ps->emotion, vol);
+}
+
+/* ============================================================
+   NEW: wrappers used by UI callbacks
+   ============================================================ */
+
+void
+playback_resume(Player_State *ps)
+{
+   /* For now, resume == play */
+   playback_play(ps);
+}
+
+void
+playback_next(Player_State *ps)
+{
+   if (!ps || !ps->album_mode || !ps->current_album_tracks) return;
+
+   ps->current_index++;
+   Track *next = eina_list_nth(ps->current_album_tracks, ps->current_index);
+   if (!next) {
+      ps->album_mode = EINA_FALSE;
+      ps->current_album = NULL;
+      ps->current_album_tracks = NULL;
+      ps->current_index = 0;
+      return;
+   }
+
+   populate_current_album_tracklist(ps);
+   playback_track_start(ps, next);
+}
+
+void
+playback_prev(Player_State *ps)
+{
+   if (!ps || !ps->album_mode || !ps->current_album_tracks) return;
+
+   if (ps->current_index <= 0)
+      return;
+
+   ps->current_index--;
+   Track *prev = eina_list_nth(ps->current_album_tracks, ps->current_index);
+   if (!prev) return;
+
+   populate_current_album_tracklist(ps);
+   playback_track_start(ps, prev);
 }

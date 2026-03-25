@@ -5,19 +5,6 @@ void _settings_open_cb(void *data, Evas_Object *obj, void *event_info);
 void
 _settings_save_cb(void *data, Evas_Object *obj, void *event_info);
 
-void
-_right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
-{
-    Evas_Event_Mouse_Down *ev = event_info;
-    if (ev->button != 3) return;
-
-    Player_State *ps = data;
-
-    Evas_Object *menu = elm_menu_add(obj);
-    elm_menu_item_add(menu, NULL, NULL, "Settings…", _settings_open_cb, ps);
-    elm_menu_move(menu, ev->canvas.x, ev->canvas.y);
-    evas_object_show(menu);
-}
 
 void
 _settings_open_cb(void *data, Evas_Object *obj, void *event_info)
