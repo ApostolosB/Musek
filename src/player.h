@@ -76,6 +76,11 @@ typedef struct _Player_State
     Evas_Object *slider;
     Evas_Object *album_tracklist;
     Evas_Object *volume_slider;
+    Evas_Object *slider_indicator;
+    Evas_Object *lbl_time_text;     // left label: "time"
+    Evas_Object *lbl_time_total;    // right label: duration
+
+
 
     /* Playback state */
     Eina_List *current_album_tracks;
@@ -97,6 +102,9 @@ typedef struct _Player_State
 
     /* Artist filter (used by artist grid → albums) */
     const char *current_artist;
+
+    Eina_Bool duration_set;
+
 
 } Player_State;
 

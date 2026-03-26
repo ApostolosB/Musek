@@ -3,19 +3,47 @@
 #include <stdio.h>
 
 void populate_current_album_tracklist(Player_State *ps);
+static void playback_length_changed_cb(void *data, Evas_Object *obj, void *event_info);
 
 static Eina_Bool
 progress_update_cb(void *data)
 {
-   Player_State *ps = data;
-   double pos = emotion_object_position_get(ps->emotion);
-   double len = emotion_object_play_length_get(ps->emotion);
+    Player_State *ps = data;
+    double pos = emotion_object_position_get(ps->emotion);
+    double len = emotion_object_play_length_get(ps->emotion);
 
-   if (len > 0.0)
-      elm_slider_value_set(ps->slider, pos / len);
+    /* NEW: update duration label once when len becomes valid */
+    if (!ps->duration_set && len > 0.1)
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d:%02d",
+                 (int)(len / 60),
+                 (int)((int)len % 60));
 
-   return EINA_TRUE;
+        elm_object_text_set(ps->lbl_time_total, buf);
+        ps->duration_set = EINA_TRUE;
+    }
+
+    if (len > 0.0)
+    {
+        /* Update slider position */
+        elm_slider_value_set(ps->slider, pos / len);
+
+        /* Update tooltip (current time) */
+        if (ps->slider_indicator)
+        {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%d:%02d",
+                     (int)(pos / 60),
+                     (int)((int)pos % 60));
+
+            elm_object_tooltip_text_set(ps->slider_indicator, buf);
+        }
+    }
+
+    return EINA_TRUE;
 }
+
 
 static void
 playback_finished_cb(void *data, Evas_Object *obj, void *event_info)
@@ -41,9 +69,15 @@ void
 playback_init(Player_State *ps)
 {
    ecore_timer_add(0.1, progress_update_cb, ps);
+
    evas_object_smart_callback_add(ps->emotion, "playback_finished",
                                   playback_finished_cb, ps);
+
+   /* NEW: update duration when Emotion knows it */
+   evas_object_smart_callback_add(ps->emotion, "length_changed",
+                                  playback_length_changed_cb, ps);
 }
+
 
 void
 playback_play(Player_State *ps)
@@ -82,11 +116,28 @@ playback_track_start(Player_State *ps, Track *t)
 {
    if (!ps || !t) return;
 
+   /* Load file into Emotion */
    emotion_object_file_set(ps->emotion, t->path);
    emotion_object_play_set(ps->emotion, EINA_TRUE);
-   update_title(ps, t);
+   ps->duration_set = EINA_FALSE;
 
+   /* Update title + album art */
+   update_title(ps, t);
    ui_update_album_art(ps, t);
+
+   /* -----------------------------------------
+      NEW: Update duration label (right of slider)
+      ----------------------------------------- */
+   double len = emotion_object_play_length_get(ps->emotion);
+   if (len > 0.0)
+   {
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%d:%02d",
+               (int)(len / 60),
+               (int)((int)len % 60));
+
+      elm_object_text_set(ps->lbl_time_total, buf);
+   }
 }
 
 void
@@ -120,7 +171,6 @@ playback_set_volume(Player_State *ps, double vol)
 void
 playback_resume(Player_State *ps)
 {
-   /* For now, resume == play */
    playback_play(ps);
 }
 
@@ -158,3 +208,20 @@ playback_prev(Player_State *ps)
    populate_current_album_tracklist(ps);
    playback_track_start(ps, prev);
 }
+static void
+playback_length_changed_cb(void *data, Evas_Object *obj, void *event_info)
+{
+   Player_State *ps = data;
+
+   double len = emotion_object_play_length_get(ps->emotion);
+   if (len > 0.0)
+   {
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%d:%02d",
+               (int)(len / 60),
+               (int)((int)len % 60));
+
+      elm_object_text_set(ps->lbl_time_total, buf);
+   }
+}
+

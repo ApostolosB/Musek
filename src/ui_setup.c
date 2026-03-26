@@ -251,15 +251,40 @@ ui_setup(Player_State *ps)
     evas_object_show(btn_next);
     elm_box_pack_end(controls, btn_next);
 
-    /* Progress slider */
-    Evas_Object *slider = elm_slider_add(right);
-    elm_object_text_set(slider, "Progress");
-    elm_slider_min_max_set(slider, 0.0, 1.0);
-    evas_object_size_hint_weight_set(slider, EVAS_HINT_EXPAND, 0.0);
-    evas_object_size_hint_align_set(slider, EVAS_HINT_FILL, 0.0);
-    evas_object_show(slider);
-    elm_box_pack_end(right, slider);
-    ps->slider = slider;
+    /* Progress bar row */
+    Evas_Object *hbox = elm_box_add(right);
+    elm_box_horizontal_set(hbox, EINA_TRUE);
+    evas_object_size_hint_weight_set(hbox, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(hbox, EVAS_HINT_FILL, 0.0);
+    evas_object_show(hbox);
+    elm_box_pack_end(right, hbox);
+
+    /* Left label: "time" */
+    ps->lbl_time_text = elm_label_add(hbox);
+    elm_object_text_set(ps->lbl_time_text, "Time");
+    evas_object_show(ps->lbl_time_text);
+    elm_box_pack_end(hbox, ps->lbl_time_text);
+
+    /* Slider */
+    ps->slider = elm_slider_add(hbox);
+    elm_slider_indicator_show_set(ps->slider, EINA_FALSE);
+    elm_slider_min_max_set(ps->slider, 0.0, 1.0);
+    evas_object_size_hint_weight_set(ps->slider, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(ps->slider, EVAS_HINT_FILL, 0.0);
+    evas_object_show(ps->slider);
+    elm_box_pack_end(hbox, ps->slider);
+
+    /* Tooltip on slider knob showing current time */
+    elm_object_tooltip_text_set(ps->slider, "0:00");
+    ps->slider_indicator = ps->slider;
+
+
+    /* Right label: total duration */
+    ps->lbl_time_total = elm_label_add(hbox);
+    elm_object_text_set(ps->lbl_time_total, "0:00");
+    evas_object_show(ps->lbl_time_total);
+    elm_box_pack_end(hbox, ps->lbl_time_total);
+
 
     /* Tracklist */
     Evas_Object *tracklist = elm_genlist_add(right);
@@ -294,7 +319,7 @@ ui_setup(Player_State *ps)
     evas_object_smart_callback_add(btn_pause, "clicked", pause_cb, ps);
     evas_object_smart_callback_add(btn_prev, "clicked", btn_prev_cb, ps);
     evas_object_smart_callback_add(btn_next, "clicked", btn_next_cb, ps);
-    evas_object_smart_callback_add(slider, "changed", slider_changed_cb, ps);
+    evas_object_smart_callback_add(ps->slider, "changed", slider_changed_cb, ps);
     evas_object_smart_callback_add(vol, "changed", volume_changed_cb, ps);
 
     /* Init playback */
