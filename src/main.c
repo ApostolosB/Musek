@@ -35,6 +35,7 @@ elm_main(int argc, char **argv)
    evas_object_show(win);
 
    elm_run();
+   evas_object_del(ps->win);
 
    library_free(ps->lib);
    free(ps);

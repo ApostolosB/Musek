@@ -97,7 +97,7 @@ _album_detect_art(Album_Entry *ae)
     }
 
     /* Fallback */
-    ae->art_path = strdup("data/noart.png");
+    ae->art_path = eina_stringshare_add("data/noart.png");
     
 }
 
