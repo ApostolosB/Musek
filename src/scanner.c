@@ -6,6 +6,9 @@
 #include <Eina.h>
 #include <Ecore.h>
 
+void artist_image_prefetch_all(Player_State *ps);
+
+
 /* Keep recursive Eio_File handles alive */
 static Eina_List *scan_jobs = NULL;
 
@@ -31,8 +34,17 @@ typedef struct _Add_Job {
 static void
 scan_done_cb(void *data, Eio_File *handler)
 {
+    Player_State *ps = data;
+
     scan_jobs = eina_list_remove(scan_jobs, handler);
+
+    if (!scan_jobs)
+    {
+        printf("SCAN COMPLETE: starting artist image prefetch\n");
+        artist_image_prefetch_all(ps);
+    }
 }
+
 
 static void
 scan_error_cb(void *data, Eio_File *handler, int error)

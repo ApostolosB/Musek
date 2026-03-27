@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <Ecore_File.h>
 #include <limits.h>
+#include <artist_image_fetch.h>
 
 /* genlist item classes (tracks view) */
 Elm_Genlist_Item_Class itc_album_header;
@@ -13,6 +14,18 @@ Elm_Genlist_Item_Class itc_track;
 Elm_Gengrid_Item_Class itc_artist_tile;   /* NEW */
 Elm_Gengrid_Item_Class itc_artist_group;
 Elm_Gengrid_Item_Class itc_album;
+
+/* Called when artist thumbnail is ready */
+static void
+_artist_thumb_ready_cb(const char *thumb_path, void *data)
+{
+    Item_Data *id = data;
+    if (!id || !id->gengrid_item) return;
+
+    /* Force gengrid to redraw this tile */
+    elm_gengrid_item_update(id->gengrid_item);
+}
+
 
 static void _album_del(void *data, Evas_Object *obj);
 
@@ -99,18 +112,49 @@ _artist_tile_content_get(void *data, Evas_Object *obj, const char *part)
         strcmp(part, "elm.swallow.content"))
         return NULL;
 
+    Item_Data *id = data;
+
     Evas_Object *img = elm_image_add(obj);
     elm_image_aspect_fixed_set(img, EINA_TRUE);
-
-    /* FIXED PATH */
-    elm_image_file_set(img, "data/artist.png", NULL);
-
-    /* Ensure visibility */
     evas_object_size_hint_min_set(img, 64, 64);
+
+    /* Compute expected thumbnail path */
+    char *thumb = artist_image_thumb_path_get(id->u.name);
+
+    if (thumb && ecore_file_exists(thumb)) {
+        /* Thumbnail already exists */
+        elm_image_file_set(img, thumb, NULL);
+    } else {
+        /* Show placeholder */
+        elm_image_file_set(img, "data/artist.png", NULL);
+
+        printf("FETCH: requesting thumb for artist: %s\n", id->u.name);
+        printf("UI: prefetch running? %d\n", artist_image_prefetch_is_running());
+
+        /* Only trigger UI fetch if prefetcher is NOT running */
+        // NEVER fetch from UI while prefetcher is running
+if (!artist_image_prefetch_is_running())
+{
+    printf("UI: prefetch NOT running, doing direct fetch\n");
+    artist_image_fetch(id->u.name, _artist_thumb_ready_cb, id);
+}
+else
+{
+    printf("UI: prefetch IS running, skipping UI fetch\n");
+}
+
+    }
+
+    free(thumb);
 
     evas_object_show(img);
     return img;
 }
+
+
+
+
+
 
 static void
 _artist_tile_del(void *data, Evas_Object *obj)
@@ -139,9 +183,8 @@ artist_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
 }
 
 /* ============================================================
-   POPULATE ARTISTS GRID
+   POPULATE ARTISTS GRID 
    ============================================================ */
-
 void
 populate_artists_grid(Player_State *ps)
 {
@@ -157,15 +200,19 @@ populate_artists_grid(Player_State *ps)
         id->u.name = name;
         id->ps = ps;
 
-        elm_gengrid_item_append(
+        /* Append tile and store the gengrid item pointer */
+        Elm_Object_Item *it = elm_gengrid_item_append(
             ps->artist_grid,
             &itc_artist_tile,
             id,
             artist_tile_selected_cb,
             ps
         );
+
+        id->gengrid_item = it;   /* <-- REQUIRED for async thumbnail updates */
     }
 }
+
 
 /* ============================================================
    ALBUM TILE TEXT + CONTENT
@@ -402,6 +449,7 @@ _album_del(void *data, Evas_Object *obj)
 }
 
 
+
 /* ============================================================
    INIT ITEM CLASSES
    ============================================================ */
@@ -442,3 +490,4 @@ ui_populate_init(void)
     itc_album.func.content_get = _album_content_get;
     itc_album.func.del = _album_del;
 }
+

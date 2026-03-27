@@ -29,7 +29,12 @@ typedef struct _Item_Data {
         Track          *track;       /* Track (already using stringshare) */
         Album_Entry    *album_entry; /* Album entry (will use stringshare) */
     } u;
+
+    /* NEW: needed so async artist thumbnails can update the tile */
+    Elm_Object_Item *gengrid_item;
+
 } Item_Data;
+
 
 
 /* ------------------------------
