@@ -1,6 +1,7 @@
-#include "ui_internal.h"
-#include "player.h"
 #include <strings.h>
+
+#include "player.h"
+#include "ui_internal.h"
 
 /* ============================================================
    ALBUM TILE SELECTED (GENGRID)

@@ -1,9 +1,10 @@
 #ifndef UI_INTERNAL_H
 #define UI_INTERNAL_H
 
-#include "ui.h"
-#include <Elementary.h>
 #include <Emotion.h>
+#include <Elementary.h>
+
+#include "ui.h"
 
 /* ------------------------------
    Item Types

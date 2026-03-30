@@ -1,9 +1,5 @@
 deps = [
   dependency('elementary'),
-  dependency('emotion'),
-  dependency('eina'),
-  dependency('ecore'),
-  dependency('eio'),
   dependency('taglib_c'),
 ]
 
@@ -18,7 +14,6 @@ srcs = [
   'ui_settings.c',
   'ui_albumart.c',
   'artist_image_fetch.c',
-  'sha1.c'
 ]
 
 executable(

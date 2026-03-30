@@ -4,19 +4,8 @@
  * Google Images-based artist thumbnail fetcher
  * modeled after Rage's albumart.c
  */
-
 #include "player.h"
-#include "stddef.h"
-#include "sha1.h"
-#include <Ecore.h>
-#include <Ecore_Con.h>
-#include <Ecore_File.h>
-#include <Eina.h>
 #include "ui_internal.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 
 #include "artist_image_fetch.h"   /* for Artist_Image_Fetch_Done_Cb */
@@ -502,7 +491,7 @@ artist_image_thumb_path_get(const char *artist)
 
     /* compute SHA1 hash of artist name */
     unsigned char sha1_out[20];
-    sha1((const unsigned char *)artist, strlen(artist), sha1_out);
+    eina_sha1((const unsigned char *)artist, strlen(artist), sha1_out);
 
     char hex[41];
     for (int i = 0; i < 20; i++)

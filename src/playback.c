@@ -1,6 +1,4 @@
 #include "player.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 void populate_current_album_tracklist(Player_State *ps);
 static void playback_length_changed_cb(void *data, Evas_Object *obj, void *event_info);

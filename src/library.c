@@ -1,10 +1,4 @@
-#include "eina_stringshare.h"
 #include "player.h"
-#include <string.h>
-#include <stdlib.h>
-#include <Eina.h>
-#include <Ecore_File.h>
-#include <limits.h>
 
 static Eina_Lock _lib_lock;
 

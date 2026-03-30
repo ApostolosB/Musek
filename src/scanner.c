@@ -1,10 +1,4 @@
-#include "eina_stringshare.h"
 #include "player.h"
-#include <string.h>
-#include <stdlib.h>
-#include <Eio.h>
-#include <Eina.h>
-#include <Ecore.h>
 
 void artist_image_prefetch_all(Player_State *ps);
 

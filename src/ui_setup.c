@@ -1,4 +1,3 @@
-#include "eina_types.h"
 #include "ui_internal.h"
 
 static void

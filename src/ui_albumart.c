@@ -1,9 +1,4 @@
 #include "player.h"
-#include <Ecore_File.h>
-#include <string.h>
-#include <stdlib.h>
-
-
 
 void
 ui_update_album_art(Player_State *ps, Track *t)

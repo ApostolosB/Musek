@@ -1,10 +1,7 @@
-#include "ui_internal.h"
-#include <string.h>
 #include <strings.h>
-#include <stdlib.h>
-#include <Ecore_File.h>
-#include <limits.h>
-#include <artist_image_fetch.h>
+
+#include "ui_internal.h"
+#include "artist_image_fetch.h"
 
 /* genlist item classes (tracks view) */
 Elm_Genlist_Item_Class itc_album_header;

@@ -1,14 +1,11 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include <Elementary.h>
-#include <Emotion.h>
 #include <Eio.h>
-#include <Eina.h>
-#include <Ecore.h>
-#include <linux/limits.h>
+#include <Emotion.h>
+#include <Elementary.h>
+
 #include <taglib/tag_c.h>
-#include <limits.h>
 
 /* ------------------------------
    Track Structure
