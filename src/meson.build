@@ -14,6 +14,7 @@ srcs = [
   'ui_settings.c',
   'ui_albumart.c',
   'artist_image_fetch.c',
+  'search.c',
 ]
 
 executable(

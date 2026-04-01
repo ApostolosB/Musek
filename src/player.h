@@ -66,6 +66,10 @@ typedef struct _Player_State
     Evas_Object *genlist;     /* Tracks view */
     Evas_Object *gengrid;     /* Albums view */
 
+    /* NEW: Search bar */
+    Evas_Object *search_entry;
+    Eina_Bool    search_visible;
+
     /* RIGHT PANE */
     Evas_Object *title_label;
     Evas_Object *album_art;
@@ -77,8 +81,6 @@ typedef struct _Player_State
     Evas_Object *lbl_time_text;     // left label: "time"
     Evas_Object *lbl_time_total;    // right label: duration
 
-
-
     /* Playback state */
     Eina_List *current_album_tracks;
     int current_index;
@@ -86,7 +88,7 @@ typedef struct _Player_State
 
     /* Album playback mode */
     Eina_Bool album_mode;
-    const char *current_album;   /* ✔ correct */
+    const char *current_album;
 
     /* Settings */
     Settings *settings;
@@ -102,9 +104,7 @@ typedef struct _Player_State
 
     Eina_Bool duration_set;
 
-
 } Player_State;
-
 
 
 /* ------------------------------
@@ -143,6 +143,5 @@ void playback_prev(Player_State *ps);
 void playback_seek(Player_State *ps, double pos);
 void playback_set_volume(Player_State *ps, double vol);
 void playback_track_start(Player_State *ps, Track *t);
-
 
 #endif

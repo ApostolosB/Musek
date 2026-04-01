@@ -52,7 +52,7 @@ extern Elm_Genlist_Item_Class itc_track;
    ------------------------------ */
 extern Elm_Gengrid_Item_Class itc_artist_group;   /* group header */
 extern Elm_Gengrid_Item_Class itc_album;          /* album tile */
-
+extern Elm_Gengrid_Item_Class itc_artist_tile;
 /* ------------------------------
    Populate Functions
    ------------------------------ */
@@ -72,6 +72,7 @@ void btn_tracks_cb(void *data, Evas_Object *obj, void *event_info);
 
 void album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info);
 void album_track_selected_cb(void *data, Evas_Object *obj, void *event_info);
+void artist_tile_selected_cb(void *data, Evas_Object *obj, void *event_info);
 
 void play_cb(void *data, Evas_Object *obj, void *event_info);
 void pause_cb(void *data, Evas_Object *obj, void *event_info);

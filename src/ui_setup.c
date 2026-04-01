@@ -1,5 +1,10 @@
 #include "ui_internal.h"
+#include "search.h"
+#include <strings.h>
 
+/* ---------------------------------------------------------
+   SHOW/HIDE VIEWS
+   --------------------------------------------------------- */
 static void
 _show_artist_grid(Player_State *ps)
 {
@@ -24,6 +29,9 @@ _show_gengrid(Player_State *ps)
     evas_object_hide(ps->genlist);
 }
 
+/* ---------------------------------------------------------
+   REFRESH CURRENT VIEW
+   --------------------------------------------------------- */
 void
 ui_refresh_current(Player_State *ps)
 {
@@ -50,6 +58,9 @@ ui_refresh_current(Player_State *ps)
     }
 }
 
+/* ---------------------------------------------------------
+   POPULATE ALBUM TRACKLIST
+   --------------------------------------------------------- */
 void
 populate_current_album_tracklist(Player_State *ps)
 {
@@ -92,6 +103,80 @@ populate_current_album_tracklist(Player_State *ps)
     ps->suppress_tracklist_callbacks = EINA_FALSE;
 }
 
+/* ---------------------------------------------------------
+   KEY HANDLER FOR SEARCH
+   --------------------------------------------------------- */
+static void
+_key_down_cb(void *data, Evas *e, void *event_info)
+{
+    Player_State *ps = data;
+    Evas_Event_Key_Down *ev = event_info;
+
+    const char *k = ev->keyname ? ev->keyname : ev->key;
+    if (!k) return;
+
+    /* Show search on Ctrl+S */
+    if (!ps->search_visible &&
+        (!strcmp(k, "s") || !strcmp(k, "S")) &&
+        evas_key_modifier_is_set(ev->modifiers, "Control"))
+    {
+        evas_object_show(ps->search_entry);
+        elm_object_focus_set(ps->search_entry, EINA_TRUE);
+        ps->search_visible = EINA_TRUE;
+
+        /* Ensure the entry starts empty */
+        elm_entry_entry_set(ps->search_entry, "");
+
+        /* Stop this key event from going further */
+        ev->event_flags |= EVAS_EVENT_FLAG_ON_HOLD;
+
+        return;
+    }
+
+    /* Hide search on Escape */
+    if (ps->search_visible && !strcmp(k, "Escape"))
+    {
+        evas_object_hide(ps->search_entry);
+        elm_object_focus_set(ps->search_entry, EINA_FALSE);
+        elm_entry_entry_set(ps->search_entry, "");
+        ps->search_visible = EINA_FALSE;
+
+        ui_refresh_current(ps);
+        return;
+    }
+}
+
+
+
+/* ---------------------------------------------------------
+   SEARCH ENTRY CHANGED
+   --------------------------------------------------------- */
+static void
+_search_changed_cb(void *data, Evas_Object *obj, void *event_info)
+{
+    Player_State *ps = data;
+    const char *q = elm_entry_entry_get(obj);
+    if (!q) q = "";
+
+    switch (ps->filter)
+    {
+        case FILTER_ARTISTS:
+            search_filter_artists(ps, q);
+            break;
+
+        case FILTER_ALBUMS:
+            search_filter_albums(ps, q);
+            break;
+
+        case FILTER_TRACKS:
+            search_filter_tracks(ps, q);
+            break;
+    }
+}
+
+/* ---------------------------------------------------------
+   UI SETUP
+   --------------------------------------------------------- */
 void
 ui_setup(Player_State *ps)
 {
@@ -103,9 +188,11 @@ ui_setup(Player_State *ps)
     evas_object_smart_callback_add(win, "delete,request", win_del_cb, NULL);
     evas_object_event_callback_add(win, EVAS_CALLBACK_MOUSE_DOWN, _right_click_cb, ps);
 
-    /* ---------------------------------------------------------
-       MAIN PANES
-       --------------------------------------------------------- */
+    /* Add key handler */
+    Evas *evas = evas_object_evas_get(ps->win);
+    evas_event_callback_add(evas, EVAS_CALLBACK_KEY_DOWN, _key_down_cb, ps);
+
+    /* MAIN PANES */
     Evas_Object *panes = elm_panes_add(win);
     elm_panes_horizontal_set(panes, EINA_FALSE);
     elm_panes_content_left_size_set(panes, 0.50);
@@ -114,7 +201,7 @@ ui_setup(Player_State *ps)
     evas_object_show(panes);
     elm_win_resize_object_add(win, panes);
 
-    /* ---------------- LEFT PANE ---------------- */
+    /* LEFT PANE */
     Evas_Object *left_box = elm_box_add(panes);
     evas_object_size_hint_weight_set(left_box, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_show(left_box);
@@ -127,16 +214,27 @@ ui_setup(Player_State *ps)
     evas_object_show(filter_box);
     elm_box_pack_end(left_box, filter_box);
 
-    /* ---------------------------------------------------------
-       STACKED VIEW CONTAINER (artist grid + album grid + tracklist)
-       --------------------------------------------------------- */
+    /* SEARCH ENTRY */
+    Evas_Object *search_entry = elm_entry_add(left_box);
+    elm_entry_single_line_set(search_entry, EINA_TRUE);
+    elm_object_part_text_set(search_entry, "guide", "Search...");
+    evas_object_size_hint_weight_set(search_entry, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(search_entry, EVAS_HINT_FILL, 0.0);
+    evas_object_hide(search_entry);
+    elm_box_pack_end(left_box, search_entry);
+    ps->search_entry = search_entry;
+    ps->search_visible = EINA_FALSE;
+
+    evas_object_smart_callback_add(search_entry, "changed", _search_changed_cb, ps);
+
+    /* STACKED VIEW */
     Evas_Object *stack = elm_table_add(left_box);
     evas_object_size_hint_weight_set(stack, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(stack, EVAS_HINT_FILL, EVAS_HINT_FILL);
     evas_object_show(stack);
     elm_box_pack_end(left_box, stack);
 
-    /* ARTIST GRID (new) */
+    /* ARTIST GRID */
     Evas_Object *artist_grid = elm_gengrid_add(stack);
     elm_gengrid_horizontal_set(artist_grid, EINA_FALSE);
     elm_gengrid_item_size_set(artist_grid, 110, 150);
@@ -146,7 +244,7 @@ ui_setup(Player_State *ps)
     evas_object_hide(artist_grid);
     ps->artist_grid = artist_grid;
 
-    /* GENLIST (Tracks view) */
+    /* GENLIST (Tracks) */
     Evas_Object *genlist = elm_genlist_add(stack);
     evas_object_size_hint_weight_set(genlist, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(genlist, EVAS_HINT_FILL, EVAS_HINT_FILL);
@@ -277,13 +375,11 @@ ui_setup(Player_State *ps)
     elm_object_tooltip_text_set(ps->slider, "0:00");
     ps->slider_indicator = ps->slider;
 
-
     /* Right label: total duration */
     ps->lbl_time_total = elm_label_add(hbox);
     elm_object_text_set(ps->lbl_time_total, "0:00");
     evas_object_show(ps->lbl_time_total);
     elm_box_pack_end(hbox, ps->lbl_time_total);
-
 
     /* Tracklist */
     Evas_Object *tracklist = elm_genlist_add(right);
