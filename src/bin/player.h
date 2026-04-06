@@ -103,6 +103,7 @@ typedef struct _Player_State
     const char *current_artist;
 
     Eina_Bool duration_set;
+    Ecore_Timer *progress_timer;
 
 } Player_State;
 
@@ -131,6 +132,7 @@ void ui_refresh_current(Player_State *ps);
 
 /* scanner.c */
 void scanner_start(Player_State *ps, const char *path);
+void scanner_shutdown(void);
 
 /* album art update */
 void ui_update_album_art(Player_State *ps, Track *t);

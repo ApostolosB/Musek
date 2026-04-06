@@ -25,11 +25,16 @@ _track_no_cmp(const void *d1, const void *d2)
 {
    const Track *t1 = d1;
    const Track *t2 = d2;
+   if (!t1 && !t2) return 0;
+   if (!t1) return -1;
+   if (!t2) return 1;
+   const char *title1 = (t1 && t1->title) ? t1->title : "";
+   const char *title2 = (t2 && t2->title) ? t2->title : "";
 
    if (t1->track_no < t2->track_no) return -1;
    if (t1->track_no > t2->track_no) return 1;
 
-   return strcasecmp(t1->title, t2->title);
+   return strcasecmp(title1, title2);
 }
 
 /* Sort albums by artist → album */
@@ -38,11 +43,15 @@ _album_sort_cb(const void *d1, const void *d2)
 {
     const Album_Entry *a = d1;
     const Album_Entry *b = d2;
+    const char *artist_a = (a && a->artist) ? a->artist : "";
+    const char *artist_b = (b && b->artist) ? b->artist : "";
+    const char *album_a = (a && a->album) ? a->album : "";
+    const char *album_b = (b && b->album) ? b->album : "";
 
-    int r = strcasecmp(a->artist, b->artist);
+    int r = strcasecmp(artist_a, artist_b);
     if (r != 0) return r;
 
-    return strcasecmp(a->album, b->album);
+    return strcasecmp(album_a, album_b);
 }
 
 /* ------------------------------
@@ -103,7 +112,12 @@ Library *
 library_new(void)
 {
    Library *lib = calloc(1, sizeof(Library));
+   if (!lib) return NULL;
    lib->album_tracks = eina_hash_string_superfast_new(NULL);
+   if (!lib->album_tracks) {
+      free(lib);
+      return NULL;
+   }
 
    eina_lock_new(&_lib_lock);
 
@@ -117,6 +131,7 @@ void
 library_add_track(Library *lib, Track *t)
 {
    if (!lib || !t) return;
+   if (!t->title || !t->artist || !t->album || !t->path || !t->dir) return;
 
    eina_lock_take(&_lib_lock);
 
@@ -139,7 +154,8 @@ library_add_track(Library *lib, Track *t)
 
       /* Check if album already exists */
       EINA_LIST_FOREACH(lib->albums, l, ae) {
-         if (!strcasecmp(ae->artist, t->artist) &&
+         if (ae && ae->artist && ae->album &&
+             !strcasecmp(ae->artist, t->artist) &&
              !strcasecmp(ae->album,  t->album)) {
             exists = EINA_TRUE;
             break;

@@ -1,16 +1,40 @@
 #include "player.h"
+#include "artist_image_fetch.h"
 
 EAPI_MAIN int
 elm_main(int argc, char **argv)
 {
-   eina_init();
-   eio_init();
+   if (!eina_init()) return 1;
+   if (!eio_init()) {
+      eina_shutdown();
+      return 1;
+   }
+
+   artist_image_fetch_init();
 
    Player_State *ps = calloc(1, sizeof(Player_State));
+   if (!ps) {
+      eio_shutdown();
+      eina_shutdown();
+      return 1;
+   }
    ps->lib = library_new();
+   if (!ps->lib) {
+      free(ps);
+      eio_shutdown();
+      eina_shutdown();
+      return 1;
+   }
 
    /* Initialize settings */
    ps->settings = calloc(1, sizeof(Settings));
+   if (!ps->settings) {
+      library_free(ps->lib);
+      free(ps);
+      eio_shutdown();
+      eina_shutdown();
+      return 1;
+   }
 
    /* Default music folder */
    const char *home = getenv("HOME");
@@ -18,8 +42,25 @@ elm_main(int argc, char **argv)
       ps->settings->music_folder = strdup(home);
    else
       ps->settings->music_folder = strdup("./");
+   if (!ps->settings->music_folder) {
+      free(ps->settings);
+      library_free(ps->lib);
+      free(ps);
+      eio_shutdown();
+      eina_shutdown();
+      return 1;
+   }
 
    Evas_Object *win = elm_win_util_standard_add("music-player", "Musek");
+   if (!win) {
+      free(ps->settings->music_folder);
+      free(ps->settings);
+      library_free(ps->lib);
+      free(ps);
+      eio_shutdown();
+      eina_shutdown();
+      return 1;
+   }
 
    /* Let EFL delete the window automatically when closed */
    elm_win_autodel_set(win, EINA_TRUE);
@@ -40,6 +81,14 @@ elm_main(int argc, char **argv)
    /* Main loop */
    elm_run();
 
+   scanner_shutdown();
+   artist_image_fetch_shutdown();
+
+   if (ps->progress_timer) {
+      ecore_timer_del(ps->progress_timer);
+      ps->progress_timer = NULL;
+   }
+
    /*
     * IMPORTANT:
     * Do NOT call evas_object_del(ps->win) here.
@@ -50,6 +99,9 @@ elm_main(int argc, char **argv)
 
    /* Now it is safe to free the library */
    library_free(ps->lib);
+
+   free(ps->settings->music_folder);
+   free(ps->settings);
 
    /* Free Player_State */
    free(ps);

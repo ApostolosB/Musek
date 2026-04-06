@@ -4,17 +4,17 @@ deps = [
 ]
 
 srcs = [
-  'main.c',
-  'library.c',
-  'playback.c',
-  'scanner.c',
-  'ui_callbacks.c',
-  'ui_populate.c',
-  'ui_setup.c',
-  'ui_settings.c',
-  'ui_albumart.c',
-  'artist_image_fetch.c',
-  'search.c',
+  'bin/main.c',
+  'bin/library.c',
+  'bin/playback.c',
+  'bin/scanner.c',
+  'bin/ui_callbacks.c',
+  'bin/ui_populate.c',
+  'bin/ui_setup.c',
+  'bin/ui_settings.c',
+  'bin/ui_albumart.c',
+  'bin/artist_image_fetch.c',
+  'bin/search.c',
 ]
 
 executable(
