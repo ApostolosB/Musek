@@ -5,6 +5,12 @@ void _settings_open_cb(void *data, Evas_Object *obj, void *event_info);
 void
 _settings_save_cb(void *data, Evas_Object *obj, void *event_info);
 
+static void
+_settings_cancel_cb(void *data, Evas_Object *obj, void *event_info)
+{
+    evas_object_del(obj);
+}
+
 
 void
 _settings_open_cb(void *data, Evas_Object *obj, void *event_info)
@@ -35,7 +41,7 @@ _settings_open_cb(void *data, Evas_Object *obj, void *event_info)
     elm_object_content_set(popup, box);
 
     elm_popup_item_append(popup, "OK", NULL, _settings_save_cb, entry);
-    elm_popup_item_append(popup, "Cancel", NULL, NULL, NULL);
+    elm_popup_item_append(popup, "Cancel", NULL, _settings_cancel_cb, NULL);
 
     evas_object_show(popup);
 }

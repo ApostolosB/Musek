@@ -7,6 +7,7 @@ static int scan_jobs = 0;
 
 /* Serialize TagLib access */
 static Eina_Lock taglib_lock;
+static Ecore_Timer *ui_refresh_timer = NULL;
 
 /* ------------------------------------------------------------
  * Worker job: passed to ecore_thread_pool_run()
@@ -21,6 +22,38 @@ typedef struct _Add_Job {
     Track        *t;
 } Add_Job;
 
+static Eina_Bool
+_ui_refresh_cb(void *data)
+{
+    Player_State *ps = data;
+    ui_refresh_timer = NULL;
+    ui_refresh_current(ps);
+    return EINA_FALSE;
+}
+
+static void
+ui_refresh_schedule(Player_State *ps)
+{
+    if (ui_refresh_timer)
+        return;
+
+    /* Coalesce many scan updates into one UI rebuild. */
+    ui_refresh_timer = ecore_timer_add(0.25, _ui_refresh_cb, ps);
+}
+
+static void
+track_free(Track *t)
+{
+    if (!t) return;
+
+    eina_stringshare_del(t->title);
+    eina_stringshare_del(t->artist);
+    eina_stringshare_del(t->album);
+    eina_stringshare_del(t->path);
+    eina_stringshare_del(t->dir);
+    free(t);
+}
+
 /* ------------------------------------------------------------
  * Done / Error callbacks
  * ------------------------------------------------------------ */
@@ -29,9 +62,16 @@ scan_done_cb(void *data, Eio_File *handler)
 {
     Player_State *ps = data;
 
-    if (--scan_jobs == 0) {
+    if (scan_jobs > 0 && --scan_jobs == 0) {
+        if (ui_refresh_timer) {
+            ecore_timer_del(ui_refresh_timer);
+            ui_refresh_timer = NULL;
+        }
+        if (ps)
+            ui_refresh_current(ps);
         printf("SCAN COMPLETE: starting artist image prefetch\n");
-        artist_image_prefetch_all(ps);
+        if (ps)
+            artist_image_prefetch_all(ps);
     }
 }
 
@@ -48,6 +88,9 @@ scan_error_cb(void *data, Eio_File *handler, int error)
 static Track *
 track_from_file(const char *path)
 {
+    if (!path || !path[0])
+        return NULL;
+
     TagLib_File *tf = taglib_file_new(path);
     if (!tf) return NULL;
 
@@ -84,6 +127,13 @@ track_from_file(const char *path)
 
     t->track_no = (int)track_no;
 
+    if (!t->title || !t->artist || !t->album || !t->path || !t->dir) {
+        track_free(t);
+        taglib_tag_free_strings();
+        taglib_file_free(tf);
+        return NULL;
+    }
+
     taglib_tag_free_strings();
     taglib_file_free(tf);
     return t;
@@ -98,7 +148,7 @@ _library_add_cb(void *data)
     Add_Job *aj = data;
 
     library_add_track(aj->ps->lib, aj->t);
-    ui_refresh_current(aj->ps);
+    ui_refresh_schedule(aj->ps);
 
     free(aj);
 }
@@ -110,6 +160,10 @@ static void
 _scan_worker(void *data, Ecore_Thread *thread)
 {
     Worker_Job *job = data;
+    if (!job || !job->path) {
+        free(job);
+        return;
+    }
 
     eina_lock_take(&taglib_lock);
     Track *t = track_from_file(job->path);
@@ -121,7 +175,9 @@ _scan_worker(void *data, Ecore_Thread *thread)
             aj->ps = job->ps;
             aj->t  = t;
             ecore_main_loop_thread_safe_call_async(_library_add_cb, aj);
-        } 
+        } else {
+            track_free(t);
+        }
     }
 
     free(job->path);
@@ -176,6 +232,8 @@ static void
 scan_main_cb(void *data, Eio_File *handler, const Eina_File_Direct_Info *info)
 {
     Player_State *ps = data;
+    if (!ps || !info || !info->path[0])
+        return;
 
     if (info->type == EINA_FILE_DIR) {
         /* Optionally skip symlinked directories to avoid weird recursion */
@@ -209,7 +267,11 @@ scan_main_cb(void *data, Eio_File *handler, const Eina_File_Direct_Info *info)
     }
 
     /* Use thread pool to avoid unbounded thread creation */
-    ecore_thread_run(_scan_worker, NULL, NULL, job);
+    Ecore_Thread *thr = ecore_thread_run(_scan_worker, NULL, NULL, job);
+    if (!thr) {
+        free(job->path);
+        free(job);
+    }
 }
 
 /* ------------------------------------------------------------
@@ -218,6 +280,9 @@ scan_main_cb(void *data, Eio_File *handler, const Eina_File_Direct_Info *info)
 void
 scanner_start(Player_State *ps, const char *path)
 {
+    if (!ps || !path || !path[0])
+        return;
+
     static Eina_Bool lock_inited = EINA_FALSE;
     if (!lock_inited) {
         eina_lock_new(&taglib_lock);
@@ -235,4 +300,13 @@ scanner_start(Player_State *ps, const char *path)
 
     if (f)
         scan_jobs++;
+}
+
+void
+scanner_shutdown(void)
+{
+    if (ui_refresh_timer) {
+        ecore_timer_del(ui_refresh_timer);
+        ui_refresh_timer = NULL;
+    }
 }

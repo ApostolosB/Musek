@@ -47,6 +47,8 @@ static char *fetch_artist = NULL;
 
 static Ecore_Event_Handler *handle_data     = NULL;
 static Ecore_Event_Handler *handle_complete = NULL;
+static Ecore_Timer         *fetch_delay_timer = NULL;
+static Ecore_Timer         *queue_timer = NULL;
 
 static Artist_Image_Fetch_Done_Cb _fetch_done_cb   = NULL;
 static void                      *_fetch_done_data = NULL;
@@ -61,6 +63,14 @@ typedef struct {
     char *artist;
     Player_State *ps;
 } Artist_Queue_Item;
+
+static void
+_queue_item_free(Artist_Queue_Item *qi)
+{
+    if (!qi) return;
+    free(qi->artist);
+    free(qi);
+}
 
 
 static Ecore_Con_Url *
@@ -84,6 +94,8 @@ _fetch(Eina_Strbuf *sb)
 static Eina_Bool
 _search_append(Eina_Strbuf *sb, const char *str, Eina_Bool hadword)
 {
+   if (!sb || !str) return hadword;
+
    const char *s;
    Eina_Bool word = EINA_FALSE;
 
@@ -119,6 +131,7 @@ static Eina_Bool
 _cb_http_data(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    Ecore_Con_Event_Url_Data *ev = event;
+   if (!ev) return EINA_FALSE;
 
    if (ev->url_con != fetch) return EINA_TRUE;
 
@@ -145,6 +158,7 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 
     Ecore_Con_Event_Url_Complete *ev = event;
     Eina_Bool ok = EINA_FALSE;
+    if (!ev) return EINA_FALSE;
 
     if (ev->url_con != fetch) return EINA_TRUE;
 
@@ -162,10 +176,12 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
             fout = NULL;
         }
 
-        if (ecore_file_size(fetchpath2) < 0)
-            ecore_file_unlink(fetchpath2);
-        else
-            ecore_file_mv(fetchpath2, fetchpath);
+        if (fetchpath && fetchpath2) {
+            if (ecore_file_size(fetchpath2) < 0)
+                ecore_file_unlink(fetchpath2);
+            else
+                ecore_file_mv(fetchpath2, fetchpath);
+        }
 
         if (_fetch_done_cb)
             _fetch_done_cb(fetchpath, _fetch_done_data);
@@ -196,6 +212,10 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 
             const char *p, *pe;
             Eina_Strbuf *sb = eina_strbuf_new();
+            if (!sb) {
+                ok = EINA_FALSE;
+                goto parse_done;
+            }
 
             /* NEW GOOGLE: "ou":"http..." */
             p = strstr(res, "\"ou\":\"http");
@@ -271,29 +291,38 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
                 if (path)
                 {
                     path2 = malloc(strlen(path) + 5);
-                    sprintf(path2, "%s.tmo", path);
+                    if (!path2) {
+                        free(path);
+                        ok = EINA_FALSE;
+                    } else {
+                        sprintf(path2, "%s.tmo", path);
 
-                    fout = fopen(path2, "wb");
-                    if (fout)
-                    {
-                        fetch_image = EINA_TRUE;
+                        fout = fopen(path2, "wb");
+                        if (fout)
+                        {
+                            fetch_image = EINA_TRUE;
 
-                        if (fetchpath) free(fetchpath);
-                        if (fetchpath2) free(fetchpath2);
+                            if (fetchpath) free(fetchpath);
+                            if (fetchpath2) free(fetchpath2);
 
-                        fetchpath = strdup(path);
-                        fetchpath2 = strdup(path2);
+                            fetchpath = strdup(path);
+                            fetchpath2 = strdup(path2);
 
-                        /* Delay second fetch */
-                        ecore_timer_add(1.5, _delay_fetch, sb);
-                        sb = NULL;
+                            /* Delay second fetch */
+                            if (fetch_delay_timer)
+                                ecore_timer_del(fetch_delay_timer);
+                            fetch_delay_timer = ecore_timer_add(1.5, _delay_fetch, sb);
+                            if (fetch_delay_timer)
+                                sb = NULL;
+                        }
+
+                        free(path);
+                        free(path2);
                     }
-
-                    free(path);
-                    free(path2);
                 }
             }
 
+parse_done:
             if (sb) eina_strbuf_free(sb);
         }
 
@@ -313,6 +342,10 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
             printf("Retrying with alternate keywords...\n");
 
             Eina_Strbuf *sb2 = eina_strbuf_new();
+            if (!sb2) {
+                retry = 0;
+                goto final_failure;
+            }
             eina_strbuf_append(sb2, Q_START);
 
             Eina_Bool had = EINA_FALSE;
@@ -332,6 +365,7 @@ _cb_http_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
         }
 
         /* FINAL FAILURE — CLEAN UP */
+final_failure:
         if (fetch) { ecore_con_url_free(fetch); fetch = NULL; }
         if (fetch_artist) { free(fetch_artist); fetch_artist = NULL; }
         if (sb_result) { eina_strbuf_free(sb_result); sb_result = NULL; }
@@ -352,9 +386,19 @@ static Eina_Bool
 _delay_fetch(void *data)
 {
    Eina_Strbuf *sb = data;
+   fetch_delay_timer = NULL;
 
    fetch = _fetch(sb);
    eina_strbuf_free(sb);
+   if (!fetch) {
+       if (_fetch_done_cb)
+           _fetch_done_cb(NULL, _fetch_done_data);
+       if (fetchpath) { free(fetchpath); fetchpath = NULL; }
+       if (fetchpath2) { free(fetchpath2); fetchpath2 = NULL; }
+       if (fetch_artist) { free(fetch_artist); fetch_artist = NULL; }
+       _fetch_done_cb = NULL;
+       _fetch_done_data = NULL;
+   }
 
    return EINA_FALSE;
 }
@@ -397,6 +441,12 @@ artist_image_fetch(const char *artist,
     {
         ecore_con_url_free(fetch);
         fetch = NULL;
+    }
+
+    if (fetch_delay_timer)
+    {
+        ecore_timer_del(fetch_delay_timer);
+        fetch_delay_timer = NULL;
     }
 
     fetch_image = EINA_FALSE;
@@ -449,11 +499,23 @@ artist_image_fetch(const char *artist,
     /* Prepare new fetch                                            */
     /* ------------------------------------------------------------ */
     fetch_artist     = strdup(artist);
+    if (!fetch_artist) {
+        if (cb) cb(NULL, data);
+        return;
+    }
     _fetch_done_cb   = cb;
     _fetch_done_data = data;
 
     /* Build Google Images query (stronger keywords) */
     sb = eina_strbuf_new();
+    if (!sb) {
+        if (_fetch_done_cb) _fetch_done_cb(NULL, _fetch_done_data);
+        free(fetch_artist);
+        fetch_artist = NULL;
+        _fetch_done_cb = NULL;
+        _fetch_done_data = NULL;
+        return;
+    }
     eina_strbuf_append(sb, Q_START);
 
     Eina_Bool had = EINA_FALSE;
@@ -468,8 +530,26 @@ artist_image_fetch(const char *artist,
     printf("FETCH: Google query URL = %s\n", eina_strbuf_string_get(sb));
 
     sb_result = eina_strbuf_new();
+    if (!sb_result) {
+        if (_fetch_done_cb) _fetch_done_cb(NULL, _fetch_done_data);
+        eina_strbuf_free(sb);
+        free(fetch_artist);
+        fetch_artist = NULL;
+        _fetch_done_cb = NULL;
+        _fetch_done_data = NULL;
+        return;
+    }
 
     fetch = _fetch(sb);
+    if (!fetch) {
+        if (_fetch_done_cb) _fetch_done_cb(NULL, _fetch_done_data);
+        eina_strbuf_free(sb_result);
+        sb_result = NULL;
+        free(fetch_artist);
+        fetch_artist = NULL;
+        _fetch_done_cb = NULL;
+        _fetch_done_data = NULL;
+    }
     eina_strbuf_free(sb);
 }
 
@@ -487,7 +567,8 @@ artist_image_thumb_path_get(const char *artist)
     snprintf(dir, sizeof(dir), "%s/.cache/musek/artist_thumbs", home);
 
     /* ensure directory exists */
-    ecore_file_mkpath(dir);
+    if (!ecore_file_mkpath(dir))
+        return NULL;
 
     /* compute SHA1 hash of artist name */
     unsigned char sha1_out[20];
@@ -499,8 +580,11 @@ artist_image_thumb_path_get(const char *artist)
     hex[40] = 0;
 
     /* final path: <dir>/<sha1>.jpg */
-    char *path = malloc(strlen(dir) + 1 + 40 + 4 + 1);
-    sprintf(path, "%s/%s.jpg", dir, hex);
+    size_t need = strlen(dir) + 1 + 40 + 4 + 1;
+    char *path = malloc(need);
+    if (!path)
+        return NULL;
+    snprintf(path, need, "%s/%s.jpg", dir, hex);
 
     return path;
 }
@@ -508,9 +592,11 @@ artist_image_thumb_path_get(const char *artist)
 void artist_image_prefetch_all(Player_State *ps)
 {
     printf("PREFETCH: artist_image_prefetch_all() CALLED\n");
+    if (!ps || !ps->lib)
+        return;
 
     if (!queue_running)
-        queue_running = EINA_TRUE;   // <-- MUST BE FIRST
+        queue_running = EINA_TRUE;
 
     // Now build the queue
     Eina_List *l;
@@ -519,13 +605,18 @@ void artist_image_prefetch_all(Player_State *ps)
     EINA_LIST_FOREACH(ps->lib->artists, l, artist)
     {
         char *thumb = artist_image_thumb_path_get(artist);
-        if (!ecore_file_exists(thumb))
+        if (thumb && !ecore_file_exists(thumb))
         {
             Artist_Queue_Item *qi = calloc(1, sizeof(Artist_Queue_Item));
-            qi->artist = strdup(artist);
-            qi->ps = ps;
+            if (qi) {
+                qi->artist = strdup(artist);
+                qi->ps = ps;
 
-            artist_queue = eina_list_append(artist_queue, qi);
+                if (qi->artist)
+                    artist_queue = eina_list_append(artist_queue, qi);
+                else
+                    free(qi);
+            }
         }
         free(thumb);
     }
@@ -538,6 +629,13 @@ static Eina_Bool
 _artist_queue_next_delayed(void *data)
 {
     Artist_Queue_Item *qi = data;
+    queue_timer = NULL;
+    if (!qi || !qi->artist) {
+        _queue_item_free(qi);
+        _artist_queue_next();
+        return EINA_FALSE;
+    }
+
     artist_image_fetch(qi->artist, _artist_queue_done, qi);
     return EINA_FALSE; // run once
 }
@@ -555,25 +653,33 @@ _artist_queue_next(void)
         return;
     }
 
-    queue_running = EINA_FALSE;
+    queue_running = EINA_TRUE;
 
     Artist_Queue_Item *qi = artist_queue->data;
     artist_queue = eina_list_remove_list(artist_queue, artist_queue);
+    if (!qi) {
+        _artist_queue_next();
+        return;
+    }
 
-        ecore_timer_add(2.0, _artist_queue_next_delayed, qi);
+    if (queue_timer)
+        ecore_timer_del(queue_timer);
+    queue_timer = ecore_timer_add(2.0, _artist_queue_next_delayed, qi);
     printf("QUEUE: fetching '%s'\n", qi->artist);
-
-    artist_image_fetch(qi->artist, _artist_queue_done, qi);
 }
 
 static void
 _artist_queue_done(const char *path, void *data)
 {
     Artist_Queue_Item *qi = data;
+    if (!qi) {
+        _artist_queue_next();
+        return;
+    }
 
     printf("QUEUE: done, got thumb '%s'\n", path ? path : "(null)");
 
-    if (path)
+    if (path && qi->ps && qi->ps->lib && qi->ps->artist_grid)
     {
         // Find the gengrid item for this artist
         Eina_List *l;
@@ -613,4 +719,73 @@ artist_image_prefetch_is_running(void)
     return queue_running;
 }
 
+void
+artist_image_fetch_init(void)
+{
+    /* No-op: resources are allocated lazily on first use. */
+}
 
+void
+artist_image_fetch_shutdown(void)
+{
+    if (queue_timer) {
+        ecore_timer_del(queue_timer);
+        queue_timer = NULL;
+    }
+
+    if (fetch_delay_timer) {
+        ecore_timer_del(fetch_delay_timer);
+        fetch_delay_timer = NULL;
+    }
+
+    if (fetch) {
+        ecore_con_url_free(fetch);
+        fetch = NULL;
+    }
+
+    fetch_image = EINA_FALSE;
+
+    if (fout) {
+        fclose(fout);
+        fout = NULL;
+    }
+
+    if (sb_result) {
+        eina_strbuf_free(sb_result);
+        sb_result = NULL;
+    }
+
+    if (fetchpath) {
+        free(fetchpath);
+        fetchpath = NULL;
+    }
+
+    if (fetchpath2) {
+        free(fetchpath2);
+        fetchpath2 = NULL;
+    }
+
+    if (fetch_artist) {
+        free(fetch_artist);
+        fetch_artist = NULL;
+    }
+
+    _fetch_done_cb = NULL;
+    _fetch_done_data = NULL;
+
+    if (handle_data) {
+        ecore_event_handler_del(handle_data);
+        handle_data = NULL;
+    }
+
+    if (handle_complete) {
+        ecore_event_handler_del(handle_complete);
+        handle_complete = NULL;
+    }
+
+    Artist_Queue_Item *qi;
+    EINA_LIST_FREE(artist_queue, qi)
+        _queue_item_free(qi);
+
+    queue_running = EINA_FALSE;
+}

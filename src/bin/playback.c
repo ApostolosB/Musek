@@ -66,7 +66,7 @@ playback_finished_cb(void *data, Evas_Object *obj, void *event_info)
 void
 playback_init(Player_State *ps)
 {
-   ecore_timer_add(0.1, progress_update_cb, ps);
+   ps->progress_timer = ecore_timer_add(0.1, progress_update_cb, ps);
 
    evas_object_smart_callback_add(ps->emotion, "playback_finished",
                                   playback_finished_cb, ps);
@@ -222,4 +222,3 @@ playback_length_changed_cb(void *data, Evas_Object *obj, void *event_info)
       elm_object_text_set(ps->lbl_time_total, buf);
    }
 }
-
