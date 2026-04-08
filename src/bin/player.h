@@ -104,6 +104,12 @@ typedef struct _Player_State
 
     Eina_Bool duration_set;
     Ecore_Timer *progress_timer;
+    Eina_Bool needs_restart;
+
+    Track *current_track;
+    Eina_Bool album_finished;
+
+
 
 } Player_State;
 
