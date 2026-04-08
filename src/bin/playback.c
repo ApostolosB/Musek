@@ -45,37 +45,29 @@ playback_finished_cb(void *data, Evas_Object *obj, void *event_info)
     Player_State *ps = data;
 
     /* Album mode: go to next track */
-   if (ps->album_mode && ps->current_album_tracks)
-{
-    ps->current_index++;
-    Track *next = eina_list_nth(ps->current_album_tracks, ps->current_index);
-
-    if (!next)
+    if (ps->album_mode && ps->current_album_tracks)
     {
-        /* Album finished */
-        ps->album_finished = EINA_TRUE;
-        ps->album_mode = EINA_FALSE;  /* temporarily leave album mode */
+        ps->current_index++;
+        Track *next = eina_list_nth(ps->current_album_tracks, ps->current_index);
+
+        if (!next)
+        {
+            /* Album finished */
+            ps->album_finished = EINA_TRUE;
+            ps->album_mode = EINA_FALSE;
+            return;
+        }
+
+        populate_current_album_tracklist(ps);
+        playback_track_start(ps, next);
         return;
     }
 
-    populate_current_album_tracklist(ps);
-    playback_track_start(ps, next);
-    return;
+    /* Single-track mode */
+    emotion_object_play_set(ps->emotion, EINA_FALSE);
+    emotion_object_file_set(ps->emotion, NULL);
+    ps->needs_restart = EINA_TRUE;
 }
-    /* --- SINGLE TRACK MODE --- */
-
-/* Single-track mode */
-emotion_object_play_set(ps->emotion, EINA_FALSE);
-
-/* Unload file completely to avoid Emotion auto-looping */
-emotion_object_file_set(ps->emotion, NULL);
-
-/* Mark that Play must reload the file */
-ps->needs_restart = EINA_TRUE;
-
-}
-
-
 
 void
 playback_init(Player_State *ps)
@@ -94,21 +86,19 @@ playback_play(Player_State *ps)
 {
     /* Case 1: album finished → restart album */
     if (ps->album_finished && ps->current_album_tracks)
-{
-    ps->album_finished = EINA_FALSE;
-    ps->album_mode = EINA_TRUE;
-    ps->current_index = 0;
+    {
+        ps->album_finished = EINA_FALSE;
+        ps->album_mode = EINA_TRUE;
+        ps->current_index = 0;
 
-    /* Update UI highlight */
-    populate_current_album_tracklist(ps);
+        populate_current_album_tracklist(ps);
 
-    Track *first = eina_list_nth(ps->current_album_tracks, 0);
-    if (first)
-        playback_track_start(ps, first);
+        Track *first = eina_list_nth(ps->current_album_tracks, 0);
+        if (first)
+            playback_track_start(ps, first);
 
-    return;
-}
-
+        return;
+    }
 
     /* Case 2: single track finished → reload track */
     if (ps->needs_restart && ps->current_track)
@@ -118,11 +108,8 @@ playback_play(Player_State *ps)
         ps->needs_restart = EINA_FALSE;
     }
 
-    /* Normal play */
     emotion_object_play_set(ps->emotion, EINA_TRUE);
 }
-
-
 
 void
 playback_pause(Player_State *ps)
@@ -155,11 +142,9 @@ playback_track_start(Player_State *ps, Track *t)
 {
     if (!ps || !t) return;
 
-    /* Store current track so Play can reload it after finishing */
     ps->current_track = t;
     ps->needs_restart = EINA_FALSE;
 
-    /* Load file fresh */
     emotion_object_file_set(ps->emotion, t->path);
     emotion_object_position_set(ps->emotion, 0.0);
     emotion_object_play_set(ps->emotion, EINA_TRUE);
@@ -180,17 +165,19 @@ playback_track_start(Player_State *ps, Track *t)
     }
 }
 
-
+/* ------------------------------------------------------------
+ * UPDATED: playback_album_start now takes artist|album key
+ * ------------------------------------------------------------ */
 void
-playback_album_start(Player_State *ps, const char *album)
+playback_album_start(Player_State *ps, const char *album_key)
 {
-    if (!ps || !album) return;
+    if (!ps || !album_key) return;
 
-    Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, album);
+    Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, album_key);
     if (!tracks) return;
 
     ps->album_mode = EINA_TRUE;
-    ps->current_album = album;
+    ps->current_album = album_key;
     ps->current_album_tracks = tracks;
     ps->current_index = 0;
 

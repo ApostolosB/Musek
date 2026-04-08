@@ -396,8 +396,6 @@ _track_text_get(void *data, Evas_Object *obj, const char *part)
 void
 populate_tracks(Player_State *ps)
 {
-    /* Leave album mode when entering Tracks view */
-  
     elm_genlist_clear(ps->genlist);
 
     Album_Entry *ae;
@@ -409,8 +407,8 @@ populate_tracks(Player_State *ps)
         /* Add album header */
         Item_Data *id_header = calloc(1, sizeof(Item_Data));
         id_header->type = ITEM_ALBUM_HEADER;
-        id_header->album = ae->album;        /* album name (string) */
-        id_header->u.album_entry = ae;       /* album entry pointer */
+        id_header->album = ae->album;
+        id_header->u.album_entry = ae;
         id_header->ps = ps;
 
         elm_genlist_item_append(ps->genlist,
@@ -421,8 +419,17 @@ populate_tracks(Player_State *ps)
                                 NULL,
                                 ps);
 
-        /* Get track list for this album */
-        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, ae->album);
+        /* Build album key: artist|album */
+        char key[512];
+        snprintf(key, sizeof(key), "%s|%s",
+                 ae->artist ? ae->artist : "",
+                 ae->album  ? ae->album  : "");
+
+        /* Get track list for this album using the combined key */
+        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, key);
+        if (!tracks)
+            continue;
+
         Track *t;
         Eina_List *lt;
 
@@ -431,8 +438,8 @@ populate_tracks(Player_State *ps)
 
             Item_Data *id = calloc(1, sizeof(Item_Data));
             id->type = ITEM_TRACK;
-            id->album = ae->album;           /* album name (string) */
-            id->u.track = t;                 /* track pointer */
+            id->album = ae->album;
+            id->u.track = t;
             id->ps = ps;
 
             elm_genlist_item_append(ps->genlist,

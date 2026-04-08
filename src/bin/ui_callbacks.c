@@ -19,13 +19,19 @@ album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
     Album_Entry *a = id->u.album_entry;
     if (!a) return;
 
+    /* Build album key: artist|album */
+    char key[512];
+    snprintf(key, sizeof(key), "%s|%s",
+             a->artist ? a->artist : "",
+             a->album  ? a->album  : "");
+
     /* Enter album mode */
     ps->album_mode = EINA_TRUE;
-    ps->current_album = a->album;   /* album name string */
+    ps->current_album = eina_stringshare_add(key);
 
-    /* Load album tracks */
+    /* Load album tracks using the combined key */
     ps->current_album_tracks =
-        eina_hash_find(ps->lib->album_tracks, a->album);
+        eina_hash_find(ps->lib->album_tracks, key);
 
     if (!ps->current_album_tracks) {
         elm_genlist_clear(ps->album_tracklist);
@@ -59,20 +65,23 @@ album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
         return;
 
     Track *clicked = id->u.track;
-    const char *album = id->album;   /* album name string */
+
+    /* Build album key from clicked track */
+    char key[512];
+    snprintf(key, sizeof(key), "%s|%s",
+             clicked->artist ? clicked->artist : "",
+             clicked->album  ? clicked->album  : "");
 
     /* ---------------------------------------------------------
-       TRACKS VIEW: show ONLY the clicked track in the tracklist
+       TRACKS VIEW: show ONLY the clicked track
        --------------------------------------------------------- */
     if (ps->filter == FILTER_TRACKS) {
 
-        /* Leave album mode entirely */
         ps->album_mode = EINA_FALSE;
         ps->current_album = NULL;
         ps->current_album_tracks = NULL;
         ps->current_index = 0;
 
-        /* Rebuild right-side tracklist with just this track */
         ps->suppress_tracklist_callbacks = EINA_TRUE;
         elm_genlist_clear(ps->album_tracklist);
 
@@ -80,7 +89,7 @@ album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
         if (nid) {
             nid->type = ITEM_TRACK;
             nid->u.track = clicked;
-            nid->album = clicked->album;  /* or album */
+            nid->album = clicked->album;
 
             elm_genlist_item_append(
                 ps->album_tracklist,
@@ -95,20 +104,19 @@ album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
 
         ps->suppress_tracklist_callbacks = EINA_FALSE;
 
-        /* Play only this track */
         playback_track_start(ps, clicked);
         return;
     }
 
     /* ---------------------------------------------------------
-       ALBUM MODE (unchanged)
+       ALBUM MODE
        --------------------------------------------------------- */
     if (!ps->album_mode) {
 
-        ps->current_album = album;
+        ps->current_album = eina_stringshare_add(key);
 
         ps->current_album_tracks =
-            eina_hash_find(ps->lib->album_tracks, ps->current_album);
+            eina_hash_find(ps->lib->album_tracks, key);
 
         /* Find index of clicked track */
         int idx = 0;
@@ -151,8 +159,6 @@ album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
     playback_track_start(ps, clicked);
 }
 
-
-
 /* ============================================================
    WINDOW CLOSE
    ============================================================ */
@@ -178,13 +184,10 @@ btn_albums_cb(void *data, Evas_Object *obj, void *event_info)
 {
     Player_State *ps = data;
 
-    /* Clear any artist filter so Albums shows ALL albums */
     ps->current_artist = NULL;
-
     ps->filter = FILTER_ALBUMS;
     ui_refresh_current(ps);
 }
-
 
 void
 btn_tracks_cb(void *data, Evas_Object *obj, void *event_info)
@@ -254,7 +257,3 @@ _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
 
     _settings_open_cb(ps, ps->win, NULL);
 }
-
-
-
-
