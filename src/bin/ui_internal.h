@@ -84,6 +84,9 @@ void btn_prev_cb(void *data, Evas_Object *obj, void *event_info);
 void win_del_cb(void *data, Evas_Object *obj, void *event_info);
 void _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
 
+void _settings_open_cb(void *data, Evas_Object *obj, void *event_info);
+
+
 /* ------------------------------
    Init
    ------------------------------ */

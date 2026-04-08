@@ -246,5 +246,15 @@ volume_changed_cb(void *data, Evas_Object *obj, void *event_info)
 void
 _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
 {
-    /* No-op */
+    Player_State *ps = data;
+    Evas_Event_Mouse_Down *ev = event_info;
+
+    if (ev->button != 3)
+        return;
+
+    _settings_open_cb(ps, ps->win, NULL);
 }
+
+
+
+
