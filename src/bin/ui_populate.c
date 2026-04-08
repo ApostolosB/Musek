@@ -115,6 +115,11 @@ _artist_tile_content_get(void *data, Evas_Object *obj, const char *part)
     elm_image_aspect_fixed_set(img, EINA_TRUE);
     evas_object_size_hint_min_set(img, 64, 64);
 
+    /* Build path to artist.png in the installed data directory */
+    const char *data_dir = elm_app_data_dir_get();
+    char artist_path[PATH_MAX];
+    snprintf(artist_path, sizeof(artist_path), "%s/artist.png", data_dir);
+
     /* Compute expected thumbnail path */
     char *thumb = artist_image_thumb_path_get(id->u.name);
 
@@ -123,23 +128,18 @@ _artist_tile_content_get(void *data, Evas_Object *obj, const char *part)
         elm_image_file_set(img, thumb, NULL);
     } else {
         /* Show placeholder */
-        elm_image_file_set(img, "data/artist.png", NULL);
+        elm_image_file_set(img, artist_path, NULL);
 
         printf("FETCH: requesting thumb for artist: %s\n", id->u.name);
         printf("UI: prefetch running? %d\n", artist_image_prefetch_is_running());
 
         /* Only trigger UI fetch if prefetcher is NOT running */
-        // NEVER fetch from UI while prefetcher is running
-if (!artist_image_prefetch_is_running())
-{
-    printf("UI: prefetch NOT running, doing direct fetch\n");
-    artist_image_fetch(id->u.name, _artist_thumb_ready_cb, id);
-}
-else
-{
-    printf("UI: prefetch IS running, skipping UI fetch\n");
-}
-
+        if (!artist_image_prefetch_is_running()) {
+            printf("UI: prefetch NOT running, doing direct fetch\n");
+            artist_image_fetch(id->u.name, _artist_thumb_ready_cb, id);
+        } else {
+            printf("UI: prefetch IS running, skipping UI fetch\n");
+        }
     }
 
     free(thumb);
@@ -147,6 +147,7 @@ else
     evas_object_show(img);
     return img;
 }
+
 
 
 
@@ -241,9 +242,14 @@ _album_content_get(void *data, Evas_Object *obj, const char *part)
     elm_image_aspect_fixed_set(img, EINA_TRUE);
     evas_object_show(img);
 
+    /* Build path to noart.png in the installed data directory */
+    const char *data_dir = elm_app_data_dir_get();
+    char noart_path[PATH_MAX];
+    snprintf(noart_path, sizeof(noart_path), "%s/noart.png", data_dir);
+
     /* Fallback if we somehow have no album entry */
     if (!a || !a->art_path || !a->art_path[0]) {
-        elm_image_file_set(img, "data/noart.png", NULL);
+        elm_image_file_set(img, noart_path, NULL);
         return img;
     }
 
@@ -256,7 +262,7 @@ _album_content_get(void *data, Evas_Object *obj, const char *part)
         Evas *evas = evas_object_evas_get(obj);
         if (!_album_thumb_generate(evas, a->art_path, thumb_path, 256)) {
             /* If generation failed, fall back to full image or noart */
-            elm_image_file_set(img, a->art_path, NULL);
+            elm_image_file_set(img, a->art_path ? a->art_path : noart_path, NULL);
             return img;
         }
     }
@@ -265,6 +271,7 @@ _album_content_get(void *data, Evas_Object *obj, const char *part)
     elm_image_file_set(img, thumb_path, NULL);
     return img;
 }
+
 
 /* ============================================================
    GENGRID ARTIST GROUP HEADER TEXT
