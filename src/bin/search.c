@@ -45,9 +45,9 @@ search_filter_artists(Player_State *ps, const char *q)
 
             Elm_Object_Item *it = elm_gengrid_item_append(
                 ps->artist_grid,
-                &itc_artist_tile,        /* EXACTLY like populate_artists_grid */
+                &itc_artist_tile,
                 id,
-                artist_tile_selected_cb, /* EXACT callback */
+                artist_tile_selected_cb,
                 ps
             );
 
@@ -90,7 +90,7 @@ search_filter_albums(Player_State *ps, const char *q)
 
                 elm_gengrid_item_append(
                     ps->gengrid,
-                    &itc_artist_group,   /* EXACT item class */
+                    &itc_artist_group,
                     gid,
                     NULL,
                     NULL
@@ -116,9 +116,9 @@ search_filter_albums(Player_State *ps, const char *q)
 
             Elm_Object_Item *it = elm_gengrid_item_append(
                 ps->gengrid,
-                &itc_album,              /* EXACT item class */
+                &itc_album,
                 aid,
-                album_tile_selected_cb,  /* EXACT callback */
+                album_tile_selected_cb,
                 ps
             );
 
@@ -141,20 +141,34 @@ search_filter_tracks(Player_State *ps, const char *q)
 
     char *q_low = lowerdup(q);
 
-    /* album_tracks: album_name → Eina_List* of Track* */
-    Eina_Iterator *it = eina_hash_iterator_data_new(ps->lib->album_tracks);
+    Album_Entry *ae;
+    Eina_List *l;
 
-    Eina_List *tracklist;
-    while (eina_iterator_next(it, (void **)&tracklist))
+    /* Iterate over albums in sorted order */
+    EINA_LIST_FOREACH(ps->lib->albums, l, ae)
     {
+        /* Build album key: artist|album */
+        char key[512];
+        snprintf(key, sizeof(key), "%s|%s",
+                 ae->artist ? ae->artist : "",
+                 ae->album  ? ae->album  : "");
+
+        /* Get track list for this album */
+        Eina_List *tracks = eina_hash_find(ps->lib->album_tracks, key);
+        if (!tracks)
+            continue;
+
         Track *t;
         Eina_List *lt;
 
-        EINA_LIST_FOREACH(tracklist, lt, t)
+        /* Iterate over tracks in this album */
+        EINA_LIST_FOREACH(tracks, lt, t)
         {
             char buf[512];
             snprintf(buf, sizeof(buf), "%s %s %s",
-                     t->artist, t->album, t->title);
+                     t->artist ? t->artist : "",
+                     t->album  ? t->album  : "",
+                     t->title  ? t->title  : "");
 
             char *low = lowerdup(buf);
 
@@ -166,15 +180,15 @@ search_filter_tracks(Player_State *ps, const char *q)
                 id->album = t->album;
                 id->u.track = t;
 
-                /* EXACT signature from your populate_tracks() */
+                /* SEARCH RESULTS BEHAVE LIKE TRACKS VIEW */
                 elm_genlist_item_append(
                     ps->genlist,
                     &itc_track,
                     id,
-                    NULL,                     /* parent */
-                    ELM_GENLIST_ITEM_NONE,    /* type */
-                    album_track_selected_cb,  /* callback */
-                    ps                        /* func_data */
+                    NULL,
+                    ELM_GENLIST_ITEM_NONE,
+                    tracklist_left_cb,   /* <-- IMPORTANT */
+                    ps
                 );
             }
 
@@ -182,6 +196,5 @@ search_filter_tracks(Player_State *ps, const char *q)
         }
     }
 
-    eina_iterator_free(it);
     free(q_low);
 }

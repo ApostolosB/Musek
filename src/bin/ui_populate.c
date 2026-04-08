@@ -447,7 +447,7 @@ populate_tracks(Player_State *ps)
                                     id,
                                     NULL,
                                     ELM_GENLIST_ITEM_NONE,
-                                    album_track_selected_cb,
+                                    tracklist_left_cb,
                                     ps);
         }
     }

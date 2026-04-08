@@ -3,6 +3,11 @@
 #include "player.h"
 #include "ui_internal.h"
 
+/* Forward declarations */
+void tracklist_left_cb(void *data, Evas_Object *obj, void *event_info);
+void tracklist_right_cb(void *data, Evas_Object *obj, void *event_info);
+
+
 /* ============================================================
    ALBUM TILE SELECTED (GENGRID)
    ============================================================ */
@@ -29,7 +34,7 @@ album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
     ps->album_mode = EINA_TRUE;
     ps->current_album = eina_stringshare_add(key);
 
-    /* Load album tracks using the combined key */
+    /* Load album tracks */
     ps->current_album_tracks =
         eina_hash_find(ps->lib->album_tracks, key);
 
@@ -49,10 +54,55 @@ album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
 }
 
 /* ============================================================
-   TRACK SELECTED (GENLIST)
+   TRACK CLICKED IN TRACKS VIEW (LEFT LIST)
+   → ALWAYS SINGLE-TRACK MODE
    ============================================================ */
 void
-album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
+tracklist_left_cb(void *data, Evas_Object *obj, void *event_info)
+{
+    Player_State *ps = data;
+
+    Elm_Object_Item *it = event_info;
+    Item_Data *id = elm_object_item_data_get(it);
+    if (!id || id->type != ITEM_TRACK)
+        return;
+
+    Track *clicked = id->u.track;
+
+    /* Enter single-track mode */
+    ps->album_mode = EINA_FALSE;
+    ps->current_album = NULL;
+    ps->current_album_tracks = NULL;
+    ps->current_index = 0;
+
+    /* Clear playlist and show ONLY clicked track */
+    ps->suppress_tracklist_callbacks = EINA_TRUE;
+    elm_genlist_clear(ps->album_tracklist);
+
+    Item_Data *nid = calloc(1, sizeof(Item_Data));
+    nid->type = ITEM_TRACK;
+    nid->ps = ps;
+    nid->u.track = clicked;
+
+    elm_genlist_item_append(ps->album_tracklist,
+                            &itc_track,
+                            nid,
+                            NULL,
+                            ELM_GENLIST_ITEM_NONE,
+                            tracklist_right_cb,
+                            ps);
+
+    ps->suppress_tracklist_callbacks = EINA_FALSE;
+
+    playback_track_start(ps, clicked);
+}
+
+/* ============================================================
+   TRACK CLICKED IN PLAYLIST (RIGHT LIST)
+   → ALBUM MODE BEHAVIOR
+   ============================================================ */
+void
+tracklist_right_cb(void *data, Evas_Object *obj, void *event_info)
 {
     Player_State *ps = data;
 
@@ -66,95 +116,37 @@ album_track_selected_cb(void *data, Evas_Object *obj, void *event_info)
 
     Track *clicked = id->u.track;
 
-    /* Build album key from clicked track */
-    char key[512];
-    snprintf(key, sizeof(key), "%s|%s",
-             clicked->artist ? clicked->artist : "",
-             clicked->album  ? clicked->album  : "");
-
-    /* ---------------------------------------------------------
-       TRACKS VIEW: show ONLY the clicked track
-       --------------------------------------------------------- */
-    if (ps->filter == FILTER_TRACKS) {
-
-        ps->album_mode = EINA_FALSE;
-        ps->current_album = NULL;
-        ps->current_album_tracks = NULL;
-        ps->current_index = 0;
-
-        ps->suppress_tracklist_callbacks = EINA_TRUE;
-        elm_genlist_clear(ps->album_tracklist);
-
-        Item_Data *nid = calloc(1, sizeof(Item_Data));
-        if (nid) {
-            nid->type = ITEM_TRACK;
-            nid->u.track = clicked;
-            nid->album = clicked->album;
-
-            elm_genlist_item_append(
-                ps->album_tracklist,
-                &itc_track,
-                nid,
-                NULL,
-                ELM_GENLIST_ITEM_NONE,
-                album_track_selected_cb,
-                ps
-            );
-        }
-
-        ps->suppress_tracklist_callbacks = EINA_FALSE;
-
-        playback_track_start(ps, clicked);
-        return;
-    }
-
-    /* ---------------------------------------------------------
-       ALBUM MODE
-       --------------------------------------------------------- */
-    if (!ps->album_mode) {
+    /* If not in album mode, enter album mode from clicked track */
+    if (!ps->album_mode)
+    {
+        char key[512];
+        snprintf(key, sizeof(key), "%s|%s",
+                 clicked->artist ? clicked->artist : "",
+                 clicked->album  ? clicked->album  : "");
 
         ps->current_album = eina_stringshare_add(key);
-
         ps->current_album_tracks =
             eina_hash_find(ps->lib->album_tracks, key);
 
-        /* Find index of clicked track */
-        int idx = 0;
-        Track *t;
-        Eina_List *l;
-
-        EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
-            if (t == clicked) {
-                ps->current_index = idx;
-                break;
-            }
-            idx++;
-        }
-
         ps->album_mode = EINA_TRUE;
-
-        ps->suppress_tracklist_callbacks = EINA_TRUE;
-        populate_current_album_tracklist(ps);
-        ps->suppress_tracklist_callbacks = EINA_FALSE;
     }
-    else {
-        /* Already in album mode — update index */
-        int idx = 0;
-        Track *t;
-        Eina_List *l;
 
-        EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
-            if (t == clicked) {
-                ps->current_index = idx;
-                break;
-            }
-            idx++;
+    /* Find index of clicked track */
+    int idx = 0;
+    Track *t;
+    Eina_List *l;
+
+    EINA_LIST_FOREACH(ps->current_album_tracks, l, t) {
+        if (t == clicked) {
+            ps->current_index = idx;
+            break;
         }
-
-        ps->suppress_tracklist_callbacks = EINA_TRUE;
-        populate_current_album_tracklist(ps);
-        ps->suppress_tracklist_callbacks = EINA_FALSE;
+        idx++;
     }
+
+    ps->suppress_tracklist_callbacks = EINA_TRUE;
+    populate_current_album_tracklist(ps);
+    ps->suppress_tracklist_callbacks = EINA_FALSE;
 
     playback_track_start(ps, clicked);
 }
@@ -193,6 +185,8 @@ void
 btn_tracks_cb(void *data, Evas_Object *obj, void *event_info)
 {
     Player_State *ps = data;
+
+    /* Switch left view only — keep playlist intact */
     ps->filter = FILTER_TRACKS;
     ui_refresh_current(ps);
 }

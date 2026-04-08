@@ -109,6 +109,9 @@ typedef struct _Player_State
     Track *current_track;
     Eina_Bool album_finished;
 
+    Eina_Bool suppress_search_callbacks;
+
+
 
 
 } Player_State;

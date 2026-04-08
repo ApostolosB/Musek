@@ -90,7 +90,7 @@ populate_current_album_tracklist(Player_State *ps)
             id,
             NULL,
             ELM_GENLIST_ITEM_NONE,
-            album_track_selected_cb,
+            tracklist_right_cb,
             ps
         );
 
@@ -133,17 +133,25 @@ _key_down_cb(void *data, Evas *e, void *event_info)
         return;
     }
 
-    /* Hide search on Escape */
-    if (ps->search_visible && !strcmp(k, "Escape"))
-    {
-        evas_object_hide(ps->search_entry);
-        elm_object_focus_set(ps->search_entry, EINA_FALSE);
-        elm_entry_entry_set(ps->search_entry, "");
-        ps->search_visible = EINA_FALSE;
+/* Hide search on Escape */
+if (ps->search_visible && !strcmp(k, "Escape"))
+{
+    ps->suppress_search_callbacks = EINA_TRUE;
 
-        ui_refresh_current(ps);
-        return;
-    }
+    elm_entry_entry_set(ps->search_entry, "");
+    evas_object_hide(ps->search_entry);
+    elm_object_focus_set(ps->search_entry, EINA_FALSE);
+    ps->search_visible = EINA_FALSE;
+
+    ui_refresh_current(ps);
+
+    ps->suppress_search_callbacks = EINA_FALSE;
+    return;
+}
+
+
+
+
 }
 
 

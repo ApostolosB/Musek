@@ -71,7 +71,9 @@ void btn_albums_cb(void *data, Evas_Object *obj, void *event_info);
 void btn_tracks_cb(void *data, Evas_Object *obj, void *event_info);
 
 void album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info);
-void album_track_selected_cb(void *data, Evas_Object *obj, void *event_info);
+void tracklist_left_cb(void *data, Evas_Object *obj, void *event_info);
+void tracklist_right_cb(void *data, Evas_Object *obj, void *event_info);
+
 void artist_tile_selected_cb(void *data, Evas_Object *obj, void *event_info);
 
 void play_cb(void *data, Evas_Object *obj, void *event_info);
