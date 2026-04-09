@@ -17,41 +17,34 @@ album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
     Player_State *ps = data;
     Elm_Object_Item *it = event_info;
     Item_Data *id = elm_object_item_data_get(it);
+    Album_Entry *ae = id->u.album_entry;
 
-    if (!id || id->type != ITEM_ALBUM)
+    if (!ps || !ae)
         return;
 
-    Album_Entry *a = id->u.album_entry;
-    if (!a) return;
-
-    /* Build album key: artist|album */
-    char key[512];
-    snprintf(key, sizeof(key), "%s|%s",
-             a->artist ? a->artist : "",
-             a->album  ? a->album  : "");
-
-    /* Enter album mode */
-    ps->album_mode = EINA_TRUE;
-    ps->current_album = eina_stringshare_add(key);
-
-    /* Load album tracks */
-    ps->current_album_tracks =
-        eina_hash_find(ps->lib->album_tracks, key);
-
-    if (!ps->current_album_tracks) {
-        elm_genlist_clear(ps->album_tracklist);
+    /* Build track list from directory (normal or compilation) */
+    Eina_List *tracks = library_tracks_for_album_dir(ps->lib, ae);
+    if (!tracks)
         return;
-    }
 
-    /* Start playback at first track */
+    ps->current_album_tracks = tracks;
     ps->current_index = 0;
-    Track *first = eina_list_nth(ps->current_album_tracks, 0);
+    ps->album_mode = EINA_TRUE;
 
+    /* Use directory as album identity */
+    ps->current_album = eina_stringshare_add(ae->path);
+
+    /* Start playback */
+    Track *first = eina_list_data_get(tracks);
     if (first)
         playback_track_start(ps, first);
 
+    /* FIX: update right-side playlist immediately */
     populate_current_album_tracklist(ps);
 }
+
+
+
 
 /* ============================================================
    TRACK CLICKED IN TRACKS VIEW (LEFT LIST)
@@ -97,6 +90,7 @@ tracklist_left_cb(void *data, Evas_Object *obj, void *event_info)
     playback_track_start(ps, clicked);
 }
 
+
 /* ============================================================
    TRACK CLICKED IN PLAYLIST (RIGHT LIST)
    → ALBUM MODE BEHAVIOR
@@ -116,19 +110,13 @@ tracklist_right_cb(void *data, Evas_Object *obj, void *event_info)
 
     Track *clicked = id->u.track;
 
-    /* If not in album mode, enter album mode from clicked track */
+    /* If not in album mode, enter album mode using directory */
     if (!ps->album_mode)
     {
-        char key[512];
-        snprintf(key, sizeof(key), "%s|%s",
-                 clicked->artist ? clicked->artist : "",
-                 clicked->album  ? clicked->album  : "");
-
-        ps->current_album = eina_stringshare_add(key);
-        ps->current_album_tracks =
-            eina_hash_find(ps->lib->album_tracks, key);
-
         ps->album_mode = EINA_TRUE;
+        ps->current_album = eina_stringshare_add(clicked->dir);
+        ps->current_album_tracks =
+            library_tracks_for_album_dir(ps->lib, id->u.album_entry);
     }
 
     /* Find index of clicked track */
@@ -150,6 +138,7 @@ tracklist_right_cb(void *data, Evas_Object *obj, void *event_info)
 
     playback_track_start(ps, clicked);
 }
+
 
 /* ============================================================
    WINDOW CLOSE

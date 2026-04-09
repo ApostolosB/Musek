@@ -19,12 +19,18 @@ typedef struct _Track {
     int   track_no;
 } Track;
 
-
+/* ------------------------------
+   Album Structure
+   ------------------------------ */
 typedef struct {
-    const char *artist;    /* eina_stringshare */
-    const char *album;     /* eina_stringshare */
-    const char *path;      /* eina_stringshare */
-    const char *art_path;  /* eina_stringshare */
+    const char *artist;        /* eina_stringshare: primary/album artist */
+    const char *album;         /* eina_stringshare */
+    const char *path;          /* eina_stringshare: directory */
+    const char *art_path;      /* eina_stringshare */
+
+    /* Compilation handling */
+    Eina_Bool   is_compilation;   /* EINA_TRUE if dir has multiple artists */
+    const char *display_artist;   /* usually artist, "Various Artists" for comps */
 } Album_Entry;
 
 
@@ -41,9 +47,10 @@ typedef enum {
    Library Structure
    ------------------------------ */
 typedef struct _Library {
-   Eina_List *artists;      // char* (sorted alphabetically)
-   Eina_List *albums;       // Album_Entry* (sorted by artist → album)
-   Eina_Hash *album_tracks; // key: album name (char*), value: Eina_List* of Track*
+   Eina_List *artists;      /* char* (sorted alphabetically) */
+   Eina_List *albums;       /* Album_Entry* (sorted by artist → album) */
+   /* key: "artist|album" (char*), value: Eina_List* of Track* */
+   Eina_Hash *album_tracks;
 } Library;
 
 /* ------------------------------
@@ -62,11 +69,11 @@ typedef struct _Player_State
     Evas_Object *win;
 
     /* LEFT PANE */
-    Evas_Object *artist_grid; /* NEW: Artists view (gengrid) */
+    Evas_Object *artist_grid; /* Artists view (gengrid) */
     Evas_Object *genlist;     /* Tracks view */
     Evas_Object *gengrid;     /* Albums view */
 
-    /* NEW: Search bar */
+    /* Search bar */
     Evas_Object *search_entry;
     Eina_Bool    search_visible;
 
@@ -78,8 +85,8 @@ typedef struct _Player_State
     Evas_Object *album_tracklist;
     Evas_Object *volume_slider;
     Evas_Object *slider_indicator;
-    Evas_Object *lbl_time_text;     // left label: "time"
-    Evas_Object *lbl_time_total;    // right label: duration
+    Evas_Object *lbl_time_text;     /* left label: "time" */
+    Evas_Object *lbl_time_total;    /* right label: duration */
 
     /* Playback state */
     Eina_List *current_album_tracks;
@@ -87,8 +94,8 @@ typedef struct _Player_State
     Eina_Bool suppress_tracklist_callbacks;
 
     /* Album playback mode */
-    Eina_Bool album_mode;
-    const char *current_album;
+    Eina_Bool   album_mode;
+    const char *current_album;      /* key: "artist|album" */
 
     /* Settings */
     Settings *settings;
@@ -102,17 +109,14 @@ typedef struct _Player_State
     /* Artist filter (used by artist grid → albums) */
     const char *current_artist;
 
-    Eina_Bool duration_set;
+    Eina_Bool    duration_set;
     Ecore_Timer *progress_timer;
-    Eina_Bool needs_restart;
+    Eina_Bool    needs_restart;
 
     Track *current_track;
     Eina_Bool album_finished;
 
     Eina_Bool suppress_search_callbacks;
-
-
-
 
 } Player_State;
 
@@ -125,7 +129,13 @@ typedef struct _Player_State
 Library *library_new(void);
 void     library_free(Library *lib);
 void     library_add_track(Library *lib, Track *t);
-
+/* optional helper if you expose it:
+Eina_Bool library_album_contains_artist(Library *lib,
+                                        const Album_Entry *ae,
+                                        const char *artist);
+*/
+Eina_List *library_tracks_for_album_dir(Library *lib, const Album_Entry *ae);
+Eina_Bool  library_album_contains_artist(Library *lib, const Album_Entry *ae, const char *artist);
 /* playback.c */
 void playback_init(Player_State *ps);
 void playback_play(Player_State *ps);
