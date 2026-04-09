@@ -106,36 +106,7 @@ _album_detect_art(Album_Entry *ae)
    Compilation Detection
    ============================================================ */
 
-/* Determine if an album directory contains multiple artists */
-static void
-_library_mark_compilations(Library *lib)
-{
-    Eina_List *l1, *l2;
-    Album_Entry *a1, *a2;
 
-    EINA_LIST_FOREACH(lib->albums, l1, a1) {
-        Eina_Bool multi = EINA_FALSE;
-
-        EINA_LIST_FOREACH(lib->albums, l2, a2) {
-            if (a1 == a2) continue;
-            if (!a1->path || !a2->path) continue;
-            if (strcmp(a1->path, a2->path) != 0) continue;
-
-            if (strcasecmp(a1->artist, a2->artist) != 0) {
-                multi = EINA_TRUE;
-                break;
-            }
-        }
-
-        if (multi) {
-            a1->is_compilation = EINA_TRUE;
-            a1->display_artist = eina_stringshare_add("Various Artists");
-        } else {
-            a1->is_compilation = EINA_FALSE;
-            a1->display_artist = a1->artist;
-        }
-    }
-}
 
 /* Public helper: does this compilation contain this artist? */
 Eina_Bool
@@ -163,6 +134,48 @@ library_album_contains_artist(Library *lib, const Album_Entry *ae, const char *a
     eina_iterator_free(it);
     return EINA_FALSE;
 }
+Eina_Bool
+library_directory_is_compilation(Library *lib, const char *dir)
+{
+    if (!lib || !dir) return EINA_FALSE;
+
+    const char *first_artist = NULL;
+    const char *first_album = NULL;
+
+    Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
+    Eina_List *tracks_list;
+
+    EINA_ITERATOR_FOREACH(it, tracks_list) {
+        Track *t;
+        Eina_List *l;
+
+        EINA_LIST_FOREACH(tracks_list, l, t) {
+            if (!t->dir || strcmp(t->dir, dir) != 0)
+                continue;
+
+            if (!first_artist) {
+                first_artist = t->artist;
+                first_album  = t->album;
+            } else {
+                /* Condition 1: multiple artists */
+                if (strcasecmp(first_artist, t->artist) != 0) {
+
+                    /* Condition 2: same album name */
+                    if (first_album && t->album &&
+                        strcasecmp(first_album, t->album) == 0) {
+
+                        eina_iterator_free(it);
+                        return EINA_TRUE;
+                    }
+                }
+            }
+        }
+    }
+
+    eina_iterator_free(it);
+    return EINA_FALSE;
+}
+
 
 /* ============================================================
    Library Init

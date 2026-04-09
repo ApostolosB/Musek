@@ -136,6 +136,9 @@ Eina_Bool library_album_contains_artist(Library *lib,
 */
 Eina_List *library_tracks_for_album_dir(Library *lib, const Album_Entry *ae);
 Eina_Bool  library_album_contains_artist(Library *lib, const Album_Entry *ae, const char *artist);
+Eina_Bool library_directory_is_compilation(Library *lib, const char *dir);
+
+
 /* playback.c */
 void playback_init(Player_State *ps);
 void playback_play(Player_State *ps);

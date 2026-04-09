@@ -302,16 +302,14 @@ populate_albums(Player_State *ps)
     Album_Entry *ae;
     Eina_List *l;
 
-    /* Track which directories we've already shown */
+    /* Track directories already shown */
     Eina_Hash *seen_dirs = eina_hash_string_superfast_new(NULL);
 
     const char *last_artist = NULL;
+    Eina_Bool compilation_header_added = EINA_FALSE;
 
-    /* --- PASS 1: Normal albums grouped by artist --- */
+    /* PASS 1 — Normal albums grouped by artist */
     EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
-
-        if (ae->is_compilation)
-            continue; /* skip compilations here */
 
         /* Skip duplicate directories */
         if (eina_hash_find(seen_dirs, ae->path))
@@ -319,13 +317,16 @@ populate_albums(Player_State *ps)
 
         eina_hash_add(seen_dirs, ae->path, (void*)1);
 
-        const char *artist = ae->display_artist ? ae->display_artist : ae->artist;
+        /* Detect compilation using Option B */
+        if (library_directory_is_compilation(ps->lib, ae->path))
+            continue; /* skip compilations here */
 
-        if (!last_artist || strcasecmp(last_artist, artist) != 0) {
+        /* Normal album: group by artist */
+        if (!last_artist || strcasecmp(last_artist, ae->artist) != 0) {
 
             Item_Data *gid = calloc(1, sizeof(Item_Data));
             gid->type = ITEM_ARTIST;
-            gid->u.name = artist;
+            gid->u.name = ae->artist;
             gid->ps = ps;
 
             elm_gengrid_item_append(
@@ -336,7 +337,7 @@ populate_albums(Player_State *ps)
                 NULL
             );
 
-            last_artist = artist;
+            last_artist = ae->artist;
         }
 
         Item_Data *aid = calloc(1, sizeof(Item_Data));
@@ -353,21 +354,13 @@ populate_albums(Player_State *ps)
         );
     }
 
-    /* --- PASS 2: Compilation section --- */
-    Eina_Bool header_added = EINA_FALSE;
-
+    /* PASS 2 — Compilation section */
     EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
 
-        if (!ae->is_compilation)
+        if (!library_directory_is_compilation(ps->lib, ae->path))
             continue;
 
-        /* Skip duplicate directories */
-        if (eina_hash_find(seen_dirs, ae->path))
-            continue;
-
-        eina_hash_add(seen_dirs, ae->path, (void*)1);
-
-        if (!header_added) {
+        if (!compilation_header_added) {
             Item_Data *gid = calloc(1, sizeof(Item_Data));
             gid->type = ITEM_ARTIST;
             gid->u.name = "Compilation";
@@ -381,7 +374,7 @@ populate_albums(Player_State *ps)
                 NULL
             );
 
-            header_added = EINA_TRUE;
+            compilation_header_added = EINA_TRUE;
         }
 
         Item_Data *aid = calloc(1, sizeof(Item_Data));
@@ -417,26 +410,25 @@ populate_albums_for_artist(Player_State *ps, const char *artist)
     Album_Entry *ae;
     Eina_List *l;
 
-    /* Track directories already shown */
     Eina_Hash *seen_dirs = eina_hash_string_superfast_new(NULL);
 
     EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
-
-        /* Normal album by this artist */
-        if (!ae->is_compilation) {
-            if (strcasecmp(ae->artist, artist) != 0)
-                continue;
-        } else {
-            /* Compilation: include only if artist appears in that folder */
-            if (!library_album_contains_artist(ps->lib, ae, artist))
-                continue;
-        }
 
         /* Skip duplicate directories */
         if (eina_hash_find(seen_dirs, ae->path))
             continue;
 
         eina_hash_add(seen_dirs, ae->path, (void*)1);
+
+        /* Compilation logic: include only if artist appears in that directory */
+        if (library_directory_is_compilation(ps->lib, ae->path)) {
+            if (!library_album_contains_artist(ps->lib, ae, artist))
+                continue;
+        } else {
+            /* Normal album: match artist */
+            if (strcasecmp(ae->artist, artist) != 0)
+                continue;
+        }
 
         Item_Data *aid = calloc(1, sizeof(Item_Data));
         aid->type = ITEM_ALBUM;
