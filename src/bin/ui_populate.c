@@ -315,13 +315,12 @@ populate_albums(Player_State *ps)
         if (eina_hash_find(seen_dirs, ae->path))
             continue;
 
+        /* Skip compilations in this pass */
+        if (ae->is_compilation)
+            continue;
+
         eina_hash_add(seen_dirs, ae->path, (void*)1);
 
-        /* Detect compilation using Option B */
-        if (library_directory_is_compilation(ps->lib, ae->path))
-            continue; /* skip compilations here */
-
-        /* Normal album: group by artist */
         if (!last_artist || strcasecmp(last_artist, ae->artist) != 0) {
 
             Item_Data *gid = calloc(1, sizeof(Item_Data));
@@ -357,13 +356,19 @@ populate_albums(Player_State *ps)
     /* PASS 2 — Compilation section */
     EINA_LIST_FOREACH(ps->lib->albums, l, ae) {
 
-        if (!library_directory_is_compilation(ps->lib, ae->path))
+        if (!ae->is_compilation)
             continue;
+
+        /* Ensure each compilation directory only appears once */
+        if (eina_hash_find(seen_dirs, ae->path))
+            continue;
+
+        eina_hash_add(seen_dirs, ae->path, (void*)1);
 
         if (!compilation_header_added) {
             Item_Data *gid = calloc(1, sizeof(Item_Data));
             gid->type = ITEM_ARTIST;
-            gid->u.name = "Compilation";
+            gid->u.name = "Compilations";
             gid->ps = ps;
 
             elm_gengrid_item_append(

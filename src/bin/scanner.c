@@ -63,17 +63,30 @@ scan_done_cb(void *data, Eio_File *handler)
     Player_State *ps = data;
 
     if (scan_jobs > 0 && --scan_jobs == 0) {
+        /* All scanning is finished here */
+
+        /* 1. Stop any pending coalesced UI refresh */
         if (ui_refresh_timer) {
             ecore_timer_del(ui_refresh_timer);
             ui_refresh_timer = NULL;
         }
+
+        /* 2. Mark compilation albums now that the library is complete */
+        if (ps && ps->lib) {
+            library_mark_compilations(ps->lib);
+        }
+
+        /* 3. Refresh UI once with the final, marked library */
         if (ps)
             ui_refresh_current(ps);
+
         printf("SCAN COMPLETE: starting artist image prefetch\n");
+
         if (ps)
             artist_image_prefetch_all(ps);
     }
 }
+
 
 static void
 scan_error_cb(void *data, Eio_File *handler, int error)

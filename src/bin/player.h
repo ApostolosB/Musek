@@ -156,6 +156,9 @@ void ui_refresh_current(Player_State *ps);
 void scanner_start(Player_State *ps, const char *path);
 void scanner_shutdown(void);
 
+void library_mark_compilations(Library *lib);
+
+
 /* album art update */
 void ui_update_album_art(Player_State *ps, Track *t);
 

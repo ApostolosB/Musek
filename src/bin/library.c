@@ -106,6 +106,56 @@ _album_detect_art(Album_Entry *ae)
    Compilation Detection
    ============================================================ */
 
+/* Determine if an album directory contains multiple artists */
+static void
+_library_mark_compilations(Library *lib)
+{
+    Album_Entry *ae;
+    Eina_List *l;
+
+    /* Iterate over all album entries */
+    EINA_LIST_FOREACH(lib->albums, l, ae) {
+
+        const char *dir = ae->path;
+        const char *first_artist = NULL;
+        const char *first_album  = NULL;
+        Eina_Bool multi_artist = EINA_FALSE;
+
+        /* Iterate over all track lists in album_tracks hash */
+        Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
+        Eina_List *tracks_list;
+
+        EINA_ITERATOR_FOREACH(it, tracks_list) {
+            Track *t;
+            Eina_List *tl;
+
+            EINA_LIST_FOREACH(tracks_list, tl, t) {
+
+                if (!t->dir || strcmp(t->dir, dir) != 0)
+                    continue;
+
+                if (!first_artist) {
+                    first_artist = t->artist;
+                    first_album  = t->album;
+                } else {
+                    if (strcasecmp(first_artist, t->artist) != 0)
+                        multi_artist = EINA_TRUE;
+                }
+            }
+        }
+
+        eina_iterator_free(it);
+
+        /* Option B: same album name + multiple artists */
+        if (multi_artist &&
+            first_album && ae->album &&
+            strcasecmp(first_album, ae->album) == 0)
+        {
+            ae->is_compilation = EINA_TRUE;
+        }
+    }
+}
+
 
 
 /* Public helper: does this compilation contain this artist? */
@@ -219,17 +269,16 @@ library_add_track(Library *lib, Track *t)
         }
     }
 
-    /* --- Add album entry (artist + album) only once --- */
+    /* --- Add album entry (directory-based, not artist-based) --- */
     if (t->album && t->album[0]) {
 
         Eina_List *l;
         Album_Entry *ae;
         Eina_Bool exists = EINA_FALSE;
 
+        /* NEW: check by directory, not artist+album */
         EINA_LIST_FOREACH(lib->albums, l, ae) {
-            if (ae && ae->artist && ae->album &&
-                !strcasecmp(ae->artist, t->artist) &&
-                !strcasecmp(ae->album,  t->album)) {
+            if (ae && ae->path && !strcmp(ae->path, t->dir)) {
                 exists = EINA_TRUE;
                 break;
             }
@@ -237,6 +286,8 @@ library_add_track(Library *lib, Track *t)
 
         if (!exists) {
             Album_Entry *new_ae = calloc(1, sizeof(Album_Entry));
+
+            /* Store the first artist/album we see — compilations will be fixed later */
             new_ae->artist = eina_stringshare_add(t->artist);
             new_ae->album  = eina_stringshare_add(t->album);
             new_ae->path   = eina_stringshare_add(t->dir);
@@ -269,7 +320,6 @@ library_add_track(Library *lib, Track *t)
 
     eina_lock_release(&_lib_lock);
 }
-
 Eina_List *
 library_tracks_for_album_dir(Library *lib, const Album_Entry *ae)
 {
@@ -299,7 +349,6 @@ library_tracks_for_album_dir(Library *lib, const Album_Entry *ae)
 
     return result;
 }
-
 
 /* ============================================================
    Free Library
@@ -345,16 +394,25 @@ library_free(Library *lib)
 
     /* Free albums */
     Album_Entry *ae;
+
     EINA_LIST_FOREACH(lib->albums, l, ae) {
         eina_stringshare_del(ae->artist);
         eina_stringshare_del(ae->album);
         eina_stringshare_del(ae->path);
         eina_stringshare_del(ae->art_path);
+
         if (ae->display_artist && ae->display_artist != ae->artist)
             eina_stringshare_del(ae->display_artist);
+
         free(ae);
     }
+
     eina_list_free(lib->albums);
 
     free(lib);
+}
+/* Public wrapper so scanner.c can call compilation detection */
+void library_mark_compilations(Library *lib)
+{
+    _library_mark_compilations(lib);
 }
