@@ -201,38 +201,46 @@ playback_resume(Player_State *ps)
 void
 playback_next(Player_State *ps)
 {
-    if (!ps || !ps->album_mode || !ps->current_album_tracks) return;
+    if (!ps || !ps->album_mode || !ps->current_album_tracks)
+        return;
+
+    int count = eina_list_count(ps->current_album_tracks);
+
+    // Already at last track → do nothing
+    if (ps->current_index >= count - 1)
+        return;
 
     ps->current_index++;
+
     Track *next = eina_list_nth(ps->current_album_tracks, ps->current_index);
     if (!next)
-    {
-        ps->album_mode = EINA_FALSE;
-        ps->current_album = NULL;
-        ps->current_album_tracks = NULL;
-        ps->current_index = 0;
         return;
-    }
 
     populate_current_album_tracklist(ps);
     playback_track_start(ps, next);
 }
 
+
 void
 playback_prev(Player_State *ps)
 {
-    if (!ps || !ps->album_mode || !ps->current_album_tracks) return;
+    if (!ps || !ps->album_mode || !ps->current_album_tracks)
+        return;
 
+    // Already at first track → do nothing
     if (ps->current_index <= 0)
         return;
 
     ps->current_index--;
+
     Track *prev = eina_list_nth(ps->current_album_tracks, ps->current_index);
-    if (!prev) return;
+    if (!prev)
+        return;
 
     populate_current_album_tracklist(ps);
     playback_track_start(ps, prev);
 }
+
 
 static void
 playback_length_changed_cb(void *data, Evas_Object *obj, void *event_info)
