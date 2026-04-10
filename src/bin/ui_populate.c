@@ -28,7 +28,7 @@ static void _album_del(void *data, Evas_Object *obj);
 
 
 /* Build a stable thumbnail path under ~/.cache/musek/album_thumbs */
-static void
+ void
 _album_thumb_path_get(const char *dir, char *out, size_t out_size)
 {
     const char *home = getenv("HOME");
@@ -47,26 +47,60 @@ _album_thumb_path_get(const char *dir, char *out, size_t out_size)
     snprintf(out, out_size, "%s/%u.jpg", cache_dir, h);
 }
 
-/* Generate a small thumbnail from src → dst using the given Evas canvas */
+/* Generate a small thumbnail from src → dst using the given Evas canvas.
+ * src may be:
+ *   - a real image file (folder.jpg, cover.png, etc.)
+ *   - an audio file with embedded artwork
+ */
 static Eina_Bool
 _album_thumb_generate(Evas *evas,
                       const char *src,
                       const char *dst,
                       int size)
 {
-    Evas_Object *img = evas_object_image_add(evas);
-    if (!img) return EINA_FALSE;
+    Eina_Bool ok = EINA_FALSE;
 
+    /* 1. Try loading src as a normal image */
+    Evas_Object *img = evas_object_image_add(evas);
     evas_object_image_file_set(img, src, NULL);
 
     int w = 0, h = 0;
     evas_object_image_size_get(img, &w, &h);
-    if (w <= 0 || h <= 0) {
+
+    /* If loading failed, try embedded artwork via Emotion */
+    if (w <= 0 || h <= 0)
+    {
         evas_object_del(img);
-        return EINA_FALSE;
+
+        /* Create a temporary Emotion object */
+        Evas_Object *em = emotion_object_add(evas);
+        if (!em) return EINA_FALSE;
+
+        emotion_object_file_set(em, src);
+
+        /* Try preview artwork first */
+        Evas_Object *art = emotion_file_meta_artwork_get(
+            em, src, EMOTION_ARTWORK_PREVIEW_IMAGE);
+
+        if (!art)
+            art = emotion_file_meta_artwork_get(
+                em, src, EMOTION_ARTWORK_IMAGE);
+
+        if (!art)
+        {
+            evas_object_del(em);
+            return EINA_FALSE;  /* No embedded art either */
+        }
+
+        /* Save embedded artwork to dst */
+        ok = evas_object_image_save(art, dst, NULL, "quality=90");
+        evas_object_del(art);
+        evas_object_del(em);
+
+        return ok;
     }
 
-    /* Scale so the longest side == size */
+    /* 2. Normal image path worked — generate thumbnail */
     int max_side = (w > h) ? w : h;
     double scale = (double)size / (double)max_side;
     int nw = (int)(w * scale);
@@ -78,12 +112,12 @@ _album_thumb_generate(Evas *evas,
     evas_object_image_fill_set(img, 0, 0, nw, nh);
     evas_object_resize(img, nw, nh);
 
-    /* Save as JPEG thumbnail */
-    Eina_Bool ok = evas_object_image_save(img, dst, NULL, "quality=90");
+    ok = evas_object_image_save(img, dst, NULL, "quality=90");
 
     evas_object_del(img);
     return ok;
 }
+
 
 
 /* ============================================================
