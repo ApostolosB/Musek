@@ -268,39 +268,83 @@ _album_content_get(void *data, Evas_Object *obj, const char *part)
     if (strcmp(part, "elm.swallow.icon"))
         return NULL;
 
-    Item_Data *id = data;
-    Album_Entry *a = id->u.album_entry;
+    Item_Data   *id = data;
+    Album_Entry *a  = id->u.album_entry;
 
     Evas_Object *img = elm_image_add(obj);
     elm_image_aspect_fixed_set(img, EINA_TRUE);
     evas_object_show(img);
 
-    /* Build path to noart.png in the installed data directory */
-    const char *data_dir = elm_app_data_dir_get();
+    /* ---------------------------------------------------------
+     * Fallback path that works BOTH installed and uninstalled
+     * --------------------------------------------------------- */
     char noart_path[PATH_MAX];
-    snprintf(noart_path, sizeof(noart_path), "%s/noart.png", data_dir);
 
-    /* Fallback if we somehow have no album entry */
-    if (!a || !a->art_path || !a->art_path[0]) {
+    /* 1) Installed case: /usr/share/musek/data/noart.png */
+    snprintf(noart_path, sizeof(noart_path),
+             "%s/data/noart.png", elm_app_data_dir_get());
+
+    /* 2) Uninstalled case: ./data/noart.png */
+    if (!ecore_file_exists(noart_path)) {
+        snprintf(noart_path, sizeof(noart_path),
+                 "data/noart.png");
+    }
+
+    /* --------------------------------------------------------- */
+
+    if (!a || !a->path || !a->path[0]) {
         elm_image_file_set(img, noart_path, NULL);
         return img;
     }
 
-    /* Build thumbnail path based on album directory */
     char thumb_path[PATH_MAX];
     _album_thumb_path_get(a->path, thumb_path, sizeof(thumb_path));
 
-    /* If thumbnail is missing, generate it */
     if (!ecore_file_exists(thumb_path)) {
-        Evas *evas = evas_object_evas_get(obj);
-        if (!_album_thumb_generate(evas, a->art_path, thumb_path, 256)) {
-            /* If generation failed, fall back to full image or noart */
-            elm_image_file_set(img, a->art_path ? a->art_path : noart_path, NULL);
-            return img;
+        Evas     *evas = evas_object_evas_get(obj);
+        Eina_Bool ok   = EINA_FALSE;
+
+        /* 1. Try folder art */
+        if (a->art_path &&
+            strcmp(a->art_path, "data/noart.png") != 0)
+        {
+            ok = _album_thumb_generate(evas, a->art_path, thumb_path, 256);
+        }
+
+        /* 2. Try embedded art */
+        if (!ok && id->ps && id->ps->lib && id->ps->emotion) {
+            Eina_List *tracks = library_tracks_for_album_dir(id->ps->lib, a);
+            if (tracks) {
+                Track *t = eina_list_data_get(tracks);
+                if (t && t->path) {
+                    Evas_Object *art =
+                        emotion_file_meta_artwork_get(id->ps->emotion,
+                                                      t->path,
+                                                      EMOTION_ARTWORK_PREVIEW_IMAGE);
+
+                    if (!art)
+                        art = emotion_file_meta_artwork_get(id->ps->emotion,
+                                                            t->path,
+                                                            EMOTION_ARTWORK_IMAGE);
+
+                    if (art) {
+                        evas_object_image_save(art, thumb_path, NULL, "quality=90");
+                        evas_object_del(art);
+                        ok = EINA_TRUE;
+                    }
+                }
+            }
+        }
+
+        /* 3. Save fallback into cache */
+        if (!ok) {
+            Evas_Object *tmp = evas_object_image_add(evas);
+            evas_object_image_file_set(tmp, noart_path, NULL);
+            evas_object_image_save(tmp, thumb_path, NULL, "quality=90");
+            evas_object_del(tmp);
         }
     }
 
-    /* At this point, thumb_path should exist (or we fell back above) */
     elm_image_file_set(img, thumb_path, NULL);
     return img;
 }
