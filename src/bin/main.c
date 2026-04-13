@@ -28,28 +28,54 @@ elm_main(int argc, char **argv)
 
    /* Initialize settings */
    ps->settings = calloc(1, sizeof(Settings));
-   if (!ps->settings) {
-      library_free(ps->lib);
-      free(ps);
-      eio_shutdown();
-      eina_shutdown();
-      return 1;
+
+   /* Try to load saved settings */
+   {
+       const char *home = getenv("HOME");
+       if (home) {
+           char cfgdir[PATH_MAX];
+           char cfgfile[PATH_MAX];
+
+           /* Build ~/.config/musek */
+           strlcpy(cfgdir, home, sizeof(cfgdir));
+           strlcat(cfgdir, "/.config/musek", sizeof(cfgdir));
+
+           /* Build ~/.config/musek/settings.conf */
+           strlcpy(cfgfile, cfgdir, sizeof(cfgfile));
+           strlcat(cfgfile, "/settings.conf", sizeof(cfgfile));
+
+           printf("Loading settings from: %s\n", cfgfile);
+
+           FILE *f = fopen(cfgfile, "r");
+           if (f) {
+               char line[PATH_MAX];
+               if (fgets(line, sizeof(line), f)) {
+                   line[strcspn(line, "\r\n")] = 0;  // strip newline
+                   ps->settings->music_folder = strdup(line);
+
+                   printf("Loaded music folder: %s\n",
+                          ps->settings->music_folder);
+               }
+               fclose(f);
+           } else {
+               printf("Settings file not found.\n");
+           }
+       }
    }
 
-   /* Default music folder */
+   /* If still NULL, fall back to HOME */
+   if (!ps->settings->music_folder) {
+       const char *home = getenv("HOME");
+       ps->settings->music_folder = strdup(home ? home : "./");
+   }
+
+   /* REMOVE THIS — it overwrote the loaded value
    const char *home = getenv("HOME");
    if (home)
       ps->settings->music_folder = strdup(home);
    else
       ps->settings->music_folder = strdup("./");
-   if (!ps->settings->music_folder) {
-      free(ps->settings);
-      library_free(ps->lib);
-      free(ps);
-      eio_shutdown();
-      eina_shutdown();
-      return 1;
-   }
+   */
 
    Evas_Object *win = elm_win_util_standard_add("music-player", "Musek");
    if (!win) {
@@ -62,9 +88,7 @@ elm_main(int argc, char **argv)
       return 1;
    }
 
-   /* Let EFL delete the window automatically when closed */
    elm_win_autodel_set(win, EINA_TRUE);
-
    ps->win = win;
 
    ui_setup(ps);
@@ -78,7 +102,6 @@ elm_main(int argc, char **argv)
    evas_object_resize(win, 1000, 600);
    evas_object_show(win);
 
-   /* Main loop */
    elm_run();
 
    scanner_shutdown();
@@ -89,24 +112,13 @@ elm_main(int argc, char **argv)
       ps->progress_timer = NULL;
    }
 
-   /*
-    * IMPORTANT:
-    * Do NOT call evas_object_del(ps->win) here.
-    * elm_win_autodel_set() already deleted the window.
-    * Calling it again causes:
-    *   "Eo ID ... is not a valid object"
-    */
-
-   /* Now it is safe to free the library */
    library_free(ps->lib);
 
    free(ps->settings->music_folder);
    free(ps->settings);
 
-   /* Free Player_State */
    free(ps);
 
-   /* Shutdown subsystems */
    eio_shutdown();
    eina_shutdown();
 

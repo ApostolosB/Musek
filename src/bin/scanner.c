@@ -323,3 +323,6 @@ scanner_shutdown(void)
         ui_refresh_timer = NULL;
     }
 }
+void scanner_reset(void) {
+    scan_jobs = 0;
+}

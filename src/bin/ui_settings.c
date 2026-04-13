@@ -21,15 +21,56 @@ _settings_save_cb(void *data, Evas_Object *obj, void *event_info)
 {
     Settings_Dialog_Data *sd = data;
 
-    const char *newdir = elm_object_text_get(sd->entry);
+    /* Get plain text (not markup) */
+    const char *newdir = elm_entry_entry_get(sd->entry);
+
     if (sd->ps && newdir && newdir[0]) {
+
+        /* Update in-memory settings */
         free(sd->ps->settings->music_folder);
         sd->ps->settings->music_folder = strdup(newdir);
+
+        /* --- SAVE SETTINGS TO DISK --- */
+        const char *home = getenv("HOME");
+        if (home) {
+            char cfgdir[PATH_MAX];
+            char cfgfile[PATH_MAX];
+
+            /* Build ~/.config/musek */
+            strlcpy(cfgdir, home, sizeof(cfgdir));
+            strlcat(cfgdir, "/.config/musek", sizeof(cfgdir));
+
+            /* Ensure directory exists */
+            ecore_file_mkpath(cfgdir);
+
+            /* Build ~/.config/musek/settings.conf */
+            strlcpy(cfgfile, cfgdir, sizeof(cfgfile));
+            strlcat(cfgfile, "/settings.conf", sizeof(cfgfile));
+
+            /* Write file */
+            FILE *f = fopen(cfgfile, "w");
+            if (f) {
+                fprintf(f, "%s\n", sd->ps->settings->music_folder);
+                fclose(f);
+            }
+        }
+
+        /* Reset library */
+        library_free(sd->ps->lib);
+        sd->ps->lib = library_new();
+
+        /* Start scanning new directory */
+        scanner_start(sd->ps, sd->ps->settings->music_folder);
+
+        /* Refresh UI */
+        ui_refresh_current(sd->ps);
     }
 
     evas_object_del(sd->popup);
     free(sd);
 }
+
+
 
 void
 _settings_open_cb(void *data, Evas_Object *parent, void *event_info)
