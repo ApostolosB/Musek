@@ -22,26 +22,17 @@ album_tile_selected_cb(void *data, Evas_Object *obj, void *event_info)
     if (!ps || !ae)
         return;
 
-    /* Build track list from directory (normal or compilation) */
-    Eina_List *tracks = library_tracks_for_album_dir(ps->lib, ae);
-    if (!tracks)
-        return;
+    /* Build album key exactly as library.c uses it */
+    char key[512];
+    snprintf(key, sizeof(key), "%s|%s", ae->artist, ae->album);
 
-    ps->current_album_tracks = tracks;
-    ps->current_index = 0;
-    ps->album_mode = EINA_TRUE;
+    /* Start playback using cloned tracks (safe across rescans) */
+    playback_album_start(ps, ae->path);
 
-    /* Use directory as album identity */
-    ps->current_album = eina_stringshare_add(ae->path);
-
-    /* Start playback */
-    Track *first = eina_list_data_get(tracks);
-    if (first)
-        playback_track_start(ps, first);
-
-    /* FIX: update right-side playlist immediately */
+    /* Update right-side playlist */
     populate_current_album_tracklist(ps);
 }
+
 
 
 
@@ -110,14 +101,16 @@ tracklist_right_cb(void *data, Evas_Object *obj, void *event_info)
 
     Track *clicked = id->u.track;
 
-    /* If not in album mode, enter album mode using directory */
-    if (!ps->album_mode)
+    /* If album ended, re-enter album mode */
+    if (!ps->album_mode && ps->current_album_tracks)
     {
         ps->album_mode = EINA_TRUE;
-        ps->current_album = eina_stringshare_add(clicked->dir);
-        ps->current_album_tracks =
-            library_tracks_for_album_dir(ps->lib, id->u.album_entry);
+        ps->album_finished = EINA_FALSE;
     }
+
+    /* If still no album mode, nothing to do */
+    if (!ps->album_mode || !ps->current_album_tracks)
+        return;
 
     /* Find index of clicked track */
     int idx = 0;
@@ -132,11 +125,13 @@ tracklist_right_cb(void *data, Evas_Object *obj, void *event_info)
         idx++;
     }
 
+    /* Update playlist highlight */
     ps->suppress_tracklist_callbacks = EINA_TRUE;
     populate_current_album_tracklist(ps);
     ps->suppress_tracklist_callbacks = EINA_FALSE;
 
-    playback_track_start(ps, clicked);
+    /* Play the clicked track */
+    playback_play_specific(ps, clicked);
 }
 
 

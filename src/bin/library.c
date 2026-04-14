@@ -40,7 +40,6 @@ _track_no_cmp(const void *d1, const void *d2)
     return strcasecmp(title1, title2);
 }
 
-/* Sort albums by artist → album */
 static int
 _album_sort_cb(const void *d1, const void *d2)
 {
@@ -59,7 +58,7 @@ _album_sort_cb(const void *d1, const void *d2)
 }
 
 /* ============================================================
-   Detect album art in a folder
+   Detect album art
    ============================================================ */
 
 static void
@@ -106,14 +105,12 @@ _album_detect_art(Album_Entry *ae)
    Compilation Detection
    ============================================================ */
 
-/* Determine if an album directory contains multiple artists */
 static void
 _library_mark_compilations(Library *lib)
 {
     Album_Entry *ae;
     Eina_List *l;
 
-    /* Iterate over all album entries */
     EINA_LIST_FOREACH(lib->albums, l, ae) {
 
         const char *dir = ae->path;
@@ -121,7 +118,6 @@ _library_mark_compilations(Library *lib)
         const char *first_album  = NULL;
         Eina_Bool multi_artist = EINA_FALSE;
 
-        /* Iterate over all track lists in album_tracks hash */
         Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
         Eina_List *tracks_list;
 
@@ -146,7 +142,6 @@ _library_mark_compilations(Library *lib)
 
         eina_iterator_free(it);
 
-        /* Option B: same album name + multiple artists */
         if (multi_artist &&
             first_album && ae->album &&
             strcasecmp(first_album, ae->album) == 0)
@@ -156,76 +151,10 @@ _library_mark_compilations(Library *lib)
     }
 }
 
-
-
-/* Public helper: does this compilation contain this artist? */
-Eina_Bool
-library_album_contains_artist(Library *lib, const Album_Entry *ae, const char *artist)
+void library_mark_compilations(Library *lib)
 {
-    if (!lib || !ae || !artist) return EINA_FALSE;
-
-    Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
-    Eina_List *track_list;
-
-    EINA_ITERATOR_FOREACH(it, track_list) {
-        Track *t;
-        Eina_List *l;
-
-        EINA_LIST_FOREACH(track_list, l, t) {
-            if (!strcmp(t->dir, ae->path)) {
-                if (!strcasecmp(t->artist, artist)) {
-                    eina_iterator_free(it);
-                    return EINA_TRUE;
-                }
-            }
-        }
-    }
-
-    eina_iterator_free(it);
-    return EINA_FALSE;
+    _library_mark_compilations(lib);
 }
-Eina_Bool
-library_directory_is_compilation(Library *lib, const char *dir)
-{
-    if (!lib || !dir) return EINA_FALSE;
-
-    const char *first_artist = NULL;
-    const char *first_album = NULL;
-
-    Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
-    Eina_List *tracks_list;
-
-    EINA_ITERATOR_FOREACH(it, tracks_list) {
-        Track *t;
-        Eina_List *l;
-
-        EINA_LIST_FOREACH(tracks_list, l, t) {
-            if (!t->dir || strcmp(t->dir, dir) != 0)
-                continue;
-
-            if (!first_artist) {
-                first_artist = t->artist;
-                first_album  = t->album;
-            } else {
-                /* Condition 1: multiple artists */
-                if (strcasecmp(first_artist, t->artist) != 0) {
-
-                    /* Condition 2: same album name */
-                    if (first_album && t->album &&
-                        strcasecmp(first_album, t->album) == 0) {
-
-                        eina_iterator_free(it);
-                        return EINA_TRUE;
-                    }
-                }
-            }
-        }
-    }
-
-    eina_iterator_free(it);
-    return EINA_FALSE;
-}
-
 
 /* ============================================================
    Library Init
@@ -238,17 +167,13 @@ library_new(void)
     if (!lib) return NULL;
 
     lib->album_tracks = eina_hash_string_superfast_new(NULL);
-    if (!lib->album_tracks) {
-        free(lib);
-        return NULL;
-    }
-
     eina_lock_new(&_lib_lock);
+
     return lib;
 }
 
 /* ============================================================
-   Add Track to Library
+   Add Track
    ============================================================ */
 
 void
@@ -269,57 +194,58 @@ library_add_track(Library *lib, Track *t)
         }
     }
 
-    /* --- Add album entry (directory-based, not artist-based) --- */
-    if (t->album && t->album[0]) {
+    /* --- Add album entry (directory-based) --- */
+    Eina_List *l;
+    Album_Entry *ae;
+    Eina_Bool exists = EINA_FALSE;
 
-        Eina_List *l;
-        Album_Entry *ae;
-        Eina_Bool exists = EINA_FALSE;
-
-        /* NEW: check by directory, not artist+album */
-        EINA_LIST_FOREACH(lib->albums, l, ae) {
-            if (ae && ae->path && !strcmp(ae->path, t->dir)) {
-                exists = EINA_TRUE;
-                break;
-            }
-        }
-
-        if (!exists) {
-            Album_Entry *new_ae = calloc(1, sizeof(Album_Entry));
-
-            /* Store the first artist/album we see — compilations will be fixed later */
-            new_ae->artist = eina_stringshare_add(t->artist);
-            new_ae->album  = eina_stringshare_add(t->album);
-            new_ae->path   = eina_stringshare_add(t->dir);
-
-            new_ae->is_compilation = EINA_FALSE;
-            new_ae->display_artist = new_ae->artist;
-
-            _album_detect_art(new_ae);
-
-            lib->albums = eina_list_append(lib->albums, new_ae);
-            lib->albums = eina_list_sort(lib->albums,
-                                         eina_list_count(lib->albums),
-                                         _album_sort_cb);
+    EINA_LIST_FOREACH(lib->albums, l, ae) {
+        if (ae && ae->path && !strcmp(ae->path, t->dir)) {
+            exists = EINA_TRUE;
+            break;
         }
     }
 
+    if (!exists) {
+        Album_Entry *new_ae = calloc(1, sizeof(Album_Entry));
+        new_ae->artist = eina_stringshare_add(t->artist);
+        new_ae->album  = eina_stringshare_add(t->album);
+        new_ae->path   = eina_stringshare_add(t->dir);
+        new_ae->display_artist = new_ae->artist;
+
+        _album_detect_art(new_ae);
+
+        lib->albums = eina_list_append(lib->albums, new_ae);
+        lib->albums = eina_list_sort(lib->albums,
+                                     eina_list_count(lib->albums),
+                                     _album_sort_cb);
+    }
+
     /* --- Add track to album_tracks hash using artist|album key --- */
-    char key[512];
-    snprintf(key, sizeof(key), "%s|%s",
-             (t->artist && t->artist[0]) ? t->artist : "",
-             (t->album  && t->album[0])  ? t->album  : "");
+    char keybuf[512];
+    snprintf(keybuf, sizeof(keybuf), "%s|%s",
+             t->artist ? t->artist : "",
+             t->album  ? t->album  : "");
 
-    Eina_List *tracks = eina_hash_find(lib->album_tracks, key);
-    tracks = eina_list_append(tracks, t);
-    tracks = eina_list_sort(tracks,
-                            eina_list_count(tracks),
-                            _track_no_cmp);
+/* --- Add track to album_tracks hash using directory key --- */
+const char *key = eina_stringshare_add(t->dir);
 
-    eina_hash_set(lib->album_tracks, eina_stringshare_add(key), tracks);
+Eina_List *tracks = eina_hash_find(lib->album_tracks, key);
+tracks = eina_list_append(tracks, t);
+tracks = eina_list_sort(tracks,
+                        eina_list_count(tracks),
+                        _track_no_cmp);
+
+eina_hash_set(lib->album_tracks, key, tracks);
+
 
     eina_lock_release(&_lib_lock);
 }
+
+/* ============================================================
+   Tracks for album directory
+   ============================================================ */
+
 Eina_List *
 library_tracks_for_album_dir(Library *lib, const Album_Entry *ae)
 {
@@ -411,8 +337,71 @@ library_free(Library *lib)
 
     free(lib);
 }
-/* Public wrapper so scanner.c can call compilation detection */
-void library_mark_compilations(Library *lib)
+/* ============================================================
+   Public wrappers (used by UI)
+   ============================================================ */
+
+Eina_Bool
+library_album_contains_artist(Library *lib, const Album_Entry *ae, const char *artist)
 {
-    _library_mark_compilations(lib);
+    if (!lib || !ae || !artist) return EINA_FALSE;
+
+    Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
+    Eina_List *track_list;
+
+    EINA_ITERATOR_FOREACH(it, track_list) {
+        Track *t;
+        Eina_List *l;
+
+        EINA_LIST_FOREACH(track_list, l, t) {
+            if (t->dir && !strcmp(t->dir, ae->path)) {
+                if (!strcasecmp(t->artist, artist)) {
+                    eina_iterator_free(it);
+                    return EINA_TRUE;
+                }
+            }
+        }
+    }
+
+    eina_iterator_free(it);
+    return EINA_FALSE;
+}
+
+Eina_Bool
+library_directory_is_compilation(Library *lib, const char *dir)
+{
+    if (!lib || !dir) return EINA_FALSE;
+
+    const char *first_artist = NULL;
+    const char *first_album = NULL;
+
+    Eina_Iterator *it = eina_hash_iterator_data_new(lib->album_tracks);
+    Eina_List *tracks_list;
+
+    EINA_ITERATOR_FOREACH(it, tracks_list) {
+        Track *t;
+        Eina_List *l;
+
+        EINA_LIST_FOREACH(tracks_list, l, t) {
+            if (!t->dir || strcmp(t->dir, dir) != 0)
+                continue;
+
+            if (!first_artist) {
+                first_artist = t->artist;
+                first_album  = t->album;
+            } else {
+                if (strcasecmp(first_artist, t->artist) != 0) {
+                    if (first_album && t->album &&
+                        !strcasecmp(first_album, t->album)) {
+
+                        eina_iterator_free(it);
+                        return EINA_TRUE;
+                    }
+                }
+            }
+        }
+    }
+
+    eina_iterator_free(it);
+    return EINA_FALSE;
 }
