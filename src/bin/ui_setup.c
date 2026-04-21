@@ -248,6 +248,7 @@ ui_setup(Player_State *ps)
     elm_gengrid_item_size_set(artist_grid, 110, 150);
     evas_object_size_hint_weight_set(artist_grid, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(artist_grid, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_gengrid_align_set(artist_grid, 0.0, 0.0);
     elm_table_pack(stack, artist_grid, 0, 0, 1, 1);
     evas_object_hide(artist_grid);
     ps->artist_grid = artist_grid;
@@ -265,6 +266,7 @@ ui_setup(Player_State *ps)
     elm_gengrid_item_size_set(gengrid, 110, 150);
     evas_object_size_hint_weight_set(gengrid, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(gengrid, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_gengrid_align_set(gengrid, 0.0, 0.0);
     elm_table_pack(stack, gengrid, 0, 0, 1, 1);
     evas_object_hide(gengrid);
     ps->gengrid = gengrid;
