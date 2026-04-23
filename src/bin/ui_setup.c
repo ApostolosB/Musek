@@ -370,6 +370,8 @@ ui_setup(Player_State *ps)
     ps->lbl_time_text = elm_label_add(hbox);
     elm_object_text_set(ps->lbl_time_text, "0:00");
     evas_object_show(ps->lbl_time_text);
+    evas_object_size_hint_padding_set(ps->lbl_time_total, 4, 0, 0, 0);
+
     elm_box_pack_end(hbox, ps->lbl_time_text);
 
     /* Slider */
@@ -389,6 +391,7 @@ ui_setup(Player_State *ps)
     ps->lbl_time_total = elm_label_add(hbox);
     elm_object_text_set(ps->lbl_time_total, "0:00");
     evas_object_show(ps->lbl_time_total);
+    evas_object_size_hint_padding_set(ps->lbl_time_total, 0, 4, 0, 0);
     elm_box_pack_end(hbox, ps->lbl_time_total);
 
     /* Tracklist */
