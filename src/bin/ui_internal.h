@@ -88,6 +88,11 @@ void _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
 
 void _settings_open_cb(void *data, Evas_Object *obj, void *event_info);
 
+void _album_art_clicked(void *data, Evas *e, Evas_Object *obj, void *event_info);
+
+void prev_area_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
+void next_area_cb(void *data, Evas *e, Evas_Object *obj, void *event_info);
+
 
 /* ------------------------------
    Init

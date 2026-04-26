@@ -235,3 +235,23 @@ _right_click_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
 
     _settings_open_cb(ps, ps->win, NULL);
 }
+void _album_art_clicked(void *data, Evas *e, Evas_Object *obj, void *event_info)
+{
+    Player_State *ps = data;
+
+    if (emotion_object_play_get(ps->emotion))
+        pause_cb(ps, obj, NULL);
+    else
+        play_cb(ps, obj, NULL);
+}
+
+void prev_area_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
+{
+    btn_prev_cb(data, obj, event_info);
+}
+
+void next_area_cb(void *data, Evas *e, Evas_Object *obj, void *event_info)
+{
+    btn_next_cb(data, obj, event_info);
+}
+

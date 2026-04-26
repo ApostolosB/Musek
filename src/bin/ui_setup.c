@@ -308,18 +308,52 @@ ui_setup(Player_State *ps)
     elm_box_pack_end(right, title);
     ps->title_label = title;
 
-    /* Album art */
-    Evas_Object *album_art = elm_image_add(right);
+
+    /* Horizontal box for prev area + album art + next area */
+
+    Evas_Object *art_row = elm_box_add(right);
+    elm_box_horizontal_set(art_row, EINA_TRUE);
+    evas_object_size_hint_weight_set(art_row, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(art_row, EVAS_HINT_FILL, 0.0);
+    evas_object_show(art_row);
+    elm_box_pack_end(right, art_row);
+    
+    /* Click area for PREVIOUS */
+    Evas_Object *prev_area = evas_object_rectangle_add(evas_object_evas_get(win));
+    evas_object_color_set(prev_area, 0, 0, 0, 0);  // invisible
+    evas_object_size_hint_weight_set(prev_area, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(prev_area, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    evas_object_show(prev_area);
+    elm_box_pack_end(art_row, prev_area);
+    evas_object_event_callback_add(prev_area, EVAS_CALLBACK_MOUSE_DOWN,
+                               prev_area_cb, ps);
+                        
+    /* Album art (play/pause) */
+    Evas_Object *album_art = elm_image_add(art_row);
     elm_image_aspect_fixed_set(album_art, EINA_TRUE);
     elm_image_resizable_set(album_art, EINA_TRUE, EINA_TRUE);
     evas_object_size_hint_min_set(album_art, 250, 250);
     evas_object_size_hint_weight_set(album_art, 0.0, 0.0);
     evas_object_size_hint_align_set(album_art, EVAS_HINT_FILL, 0.0);
     evas_object_show(album_art);
-    elm_box_pack_end(right, album_art);
+    elm_box_pack_end(art_row, album_art);
     ps->album_art = album_art;
 
     elm_image_file_set(album_art, "/data/noart.png", NULL);
+
+    /* Album art click = play/pause */
+    evas_object_event_callback_add(album_art, EVAS_CALLBACK_MOUSE_DOWN,
+                               _album_art_clicked, ps);
+
+    /* Click area for NEXT */
+    Evas_Object *next_area = evas_object_rectangle_add(evas_object_evas_get(win));
+    evas_object_color_set(next_area, 0, 0, 0, 0);  // invisible
+    evas_object_size_hint_weight_set(next_area, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(next_area, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    evas_object_show(next_area);
+    elm_box_pack_end(art_row, next_area);
+    evas_object_event_callback_add(next_area, EVAS_CALLBACK_MOUSE_DOWN,
+                               next_area_cb, ps);
 
     /* Emotion player */
     Evas_Object *emotion = emotion_object_add(evas_object_evas_get(win));
@@ -329,34 +363,6 @@ ui_setup(Player_State *ps)
     evas_object_show(emotion);
     elm_box_pack_end(right, emotion);
     ps->emotion = emotion;
-
-    /* Playback controls */
-    Evas_Object *controls = elm_box_add(right);
-    elm_box_horizontal_set(controls, EINA_TRUE);
-    evas_object_size_hint_weight_set(controls, 0.0, 0.0);
-    evas_object_size_hint_align_set(controls, EVAS_HINT_FILL, 0.0);
-    evas_object_show(controls);
-    elm_box_pack_end(right, controls);
-
-    Evas_Object *btn_prev = elm_button_add(controls);
-    elm_object_text_set(btn_prev, "<<");
-    evas_object_show(btn_prev);
-    elm_box_pack_end(controls, btn_prev);
-
-    Evas_Object *btn_play = elm_button_add(controls);
-    elm_object_text_set(btn_play, "Play");
-    evas_object_show(btn_play);
-    elm_box_pack_end(controls, btn_play);
-
-    Evas_Object *btn_pause = elm_button_add(controls);
-    elm_object_text_set(btn_pause, "Pause");
-    evas_object_show(btn_pause);
-    elm_box_pack_end(controls, btn_pause);
-
-    Evas_Object *btn_next = elm_button_add(controls);
-    elm_object_text_set(btn_next, ">>");
-    evas_object_show(btn_next);
-    elm_box_pack_end(controls, btn_next);
 
     /* Progress bar row */
     Evas_Object *hbox = elm_box_add(right);
@@ -423,10 +429,7 @@ ui_setup(Player_State *ps)
     ps->volume_slider = vol;
 
     /* Callbacks */
-    evas_object_smart_callback_add(btn_play, "clicked", play_cb, ps);
-    evas_object_smart_callback_add(btn_pause, "clicked", pause_cb, ps);
-    evas_object_smart_callback_add(btn_prev, "clicked", btn_prev_cb, ps);
-    evas_object_smart_callback_add(btn_next, "clicked", btn_next_cb, ps);
+
     evas_object_smart_callback_add(ps->slider, "changed", slider_changed_cb, ps);
     evas_object_smart_callback_add(vol, "changed", volume_changed_cb, ps);
 
